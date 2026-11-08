@@ -9,11 +9,18 @@ the rule that fired, a plain reason and how confident it is.
 
 **Live:** https://drift.oyedokunken.workers.dev
 
-| On a phone (sample mode)                                      | On a desktop (sample mode)                                      |
+| Live, on a phone                                      | Live, on a desktop                                       |
+| ----------------------------------------------------- | -------------------------------------------------------- |
+| ![Drift on a phone](docs/screenshots/live-mobile.png) | ![Drift on a desktop](docs/screenshots/live-desktop.png) |
+
+The images above are the real live site, with the network healthy. The mismatch design
+is shown in sample mode:
+
+| Sample mode, 375px                                            | Sample mode, 1280px                                             |
 | ------------------------------------------------------------- | --------------------------------------------------------------- |
 | ![Mismatch cards at 375px](docs/screenshots/mismatch-375.png) | ![Mismatch cards at 1280px](docs/screenshots/mismatch-1280.png) |
 
-Both images use sample mode: open `/?sample=1` to see the mismatch design built from
+The sample images come from `/?sample=1`: open `/?sample=1` to see the mismatch design built from
 fixture data by the real engine, under a persistent "Sample data, not live" banner. It
 only turns on for that exact query parameter and makes no network request. No real
 mismatch has appeared in the hours Drift has been watched (see
@@ -148,7 +155,7 @@ See [docs/VERIFICATION.md](docs/VERIFICATION.md) for the dated record. In short:
   real persisted storage: success, a stale fallback when TfL rejected the key, and a
   typed 503 with empty storage. The key appeared in no log or response.
 - Lighthouse on the deployed site, mobile profile, median of three runs:
-  **Performance 97, Accessibility 100, Best Practices 100, SEO 100.**
+  **Performance 98, Accessibility 100, Best Practices 100, SEO 100** (after the 2026-11-08 redesign).
 - No horizontal scroll at 320, 375, 768 or 1280 pixels.
 
 Size: the initial JavaScript is about 115 KB gzipped (React is 67 KB of that), with a
