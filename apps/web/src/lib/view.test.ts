@@ -1,3 +1,4 @@
+import { config } from '@drift/engine';
 import { describe, expect, it } from 'vitest';
 import {
   flowingVerdict,
@@ -11,10 +12,13 @@ import {
   countOutcomes,
   lineCode,
   lineName,
-  observedText,
   ruleTitle,
   sortVerdicts,
-  trackPositions,
+  liveFigure,
+  trackCaption,
+  trackDescription,
+  trackReading,
+  trackShares,
 } from './view.ts';
 
 describe('line names', () => {
@@ -70,20 +74,31 @@ describe('sortVerdicts', () => {
   });
 });
 
+describe('liveFigure', () => {
+  it('counts trains, singular and plural', () => {
+    expect(liveFigure(quietVerdict('central'))).toEqual({
+      value: 1,
+      label: 'train due in 15 min',
+    });
+    expect(liveFigure(verdict('central'))).toEqual({
+      value: 30,
+      label: 'trains due in 15 min',
+    });
+  });
+
+  it('gives the gap in minutes for wide gaps', () => {
+    expect(liveFigure(gapsVerdict('central'))).toEqual({
+      value: 18,
+      label: 'minutes between trains',
+    });
+  });
+
+  it('has no figure when there was no live reading', () => {
+    expect(liveFigure(unknownVerdict('central'))).toBeNull();
+  });
+});
+
 describe('text', () => {
-  it('describes train counts, singular and plural', () => {
-    expect(observedText(quietVerdict('central'))).toBe('1 train due within 15 minutes');
-    expect(observedText(verdict('central'))).toBe('30 trains due within 15 minutes');
-  });
-
-  it('describes the headway for wide gaps', () => {
-    expect(observedText(gapsVerdict('central'))).toBe('Trains about 18 minutes apart');
-  });
-
-  it('says so when there was no live reading', () => {
-    expect(observedText(unknownVerdict('central'))).toBe('No live reading');
-  });
-
   it('has a title for every rule and a label for every outcome', () => {
     expect(ruleTitle('quiet-while-good')).toBe('Quiet while good');
     expect(ruleTitle('no-arrivals')).toBe('No live data');
@@ -95,51 +110,120 @@ describe('text', () => {
   });
 });
 
-describe('trackPositions', () => {
-  it('has no observed marker when there is not enough data', () => {
-    expect(trackPositions(unknownVerdict('central')).observed).toBeNull();
-  });
-
-  it('puts a match marker exactly on the official marker', () => {
-    const { official, observed } = trackPositions(verdict('central'));
-    expect(observed).toBe(official);
-  });
-
-  it('puts a quiet line far below the running position', () => {
-    const { official, observed } = trackPositions(quietVerdict('central'));
-    expect(observed).not.toBeNull();
-    expect(official - (observed ?? 0)).toBeGreaterThan(0.4);
-  });
-
-  it('puts a flowing but suspended line far above the stopped position', () => {
-    const { official, observed } = trackPositions(flowingVerdict('victoria'));
-    expect((observed ?? 0) - official).toBeGreaterThan(0.4);
-  });
-
-  it('puts wide gaps part way down from running', () => {
-    const { official, observed } = trackPositions(gapsVerdict('central'));
-    expect(official - (observed ?? 0)).toBeGreaterThan(0.3);
-  });
-
-  it('keeps every position on the track', () => {
-    for (const v of [
-      quietVerdict('a' as never),
-      flowingVerdict('a' as never),
-      gapsVerdict('a' as never),
-    ]) {
-      const { official, observed } = trackPositions(v);
-      for (const position of [official, observed ?? 0]) {
-        expect(position).toBeGreaterThanOrEqual(0);
-        expect(position).toBeLessThanOrEqual(1);
-      }
-    }
-  });
-
-  it('treats a match on a suspended line as official stopped', () => {
-    const stopped = verdict('central', {
-      official: { severity: 2, label: 'Suspended' },
-      ruleId: 'in-step',
+describe('trackReading', () => {
+  it('compares trains with the floor while service is good', () => {
+    expect(trackReading(verdict('central'))).toEqual({
+      unit: 'trains',
+      value: 30,
+      threshold: config.QUIET_MIN_VEHICLES,
+      domain: config.FLOWING_HIGH_VEHICLES * 2,
+      limit: 'floor',
     });
-    expect(trackPositions(stopped).official).toBeLessThan(0.2);
+  });
+
+  it('uses the lower floor for a line with its own', () => {
+    expect(trackReading(verdict('waterloo-city'))?.threshold).toBe(
+      config.QUIET_MIN_VEHICLES_BY_LINE['waterloo-city'],
+    );
+  });
+
+  it('compares trains with the ceiling while the line is suspended', () => {
+    const reading = trackReading(flowingVerdict('victoria'));
+    expect(reading).toMatchObject({
+      unit: 'trains',
+      value: 30,
+      threshold: config.FLOWING_MIN_VEHICLES,
+      limit: 'ceiling',
+    });
+  });
+
+  it('treats an in step line that should be stopped as a ceiling', () => {
+    const stopped = verdict('central', { official: { severity: 2, label: 'Suspended' } });
+    expect(trackReading(stopped)?.limit).toBe('ceiling');
+  });
+
+  it('compares the gap in minutes with the wide gap threshold', () => {
+    expect(trackReading(gapsVerdict('central'))).toEqual({
+      unit: 'minutes',
+      value: 18,
+      threshold: config.WIDE_HEADWAY_SEC / 60,
+      domain: (config.WIDE_HEADWAY_SEC * 2) / 60,
+      limit: 'ceiling',
+    });
+  });
+
+  it('draws nothing without live data or for an unknown verdict', () => {
+    expect(trackReading(unknownVerdict('central'))).toBeNull();
+    expect(
+      trackReading(verdict('central', { outcome: 'unknown', ruleId: 'network-quiet' })),
+    ).toBeNull();
+  });
+
+  it('draws nothing for closed hours, which has its own rule', () => {
+    expect(trackReading(verdict('central', { ruleId: 'closed-hours' }))).toBeNull();
+  });
+
+  it('draws nothing when a gap verdict has no headway', () => {
+    const noHeadway = gapsVerdict('central');
+    expect(
+      trackReading({
+        ...noHeadway,
+        observed: noHeadway.observed && { ...noHeadway.observed, headwaySec: null },
+      }),
+    ).toBeNull();
+  });
+
+  it('draws nothing for the one sided case, which the count cannot explain', () => {
+    const oneSided = verdict('central', {
+      outcome: 'mismatch',
+      ruleId: 'quiet-while-good',
+    });
+    expect(trackReading(oneSided)).toBeNull();
+  });
+
+  it('keeps the quiet verdict below its floor', () => {
+    const reading = trackReading(quietVerdict('central'));
+    expect(reading).not.toBeNull();
+    expect(reading?.value).toBeLessThan(reading?.threshold ?? 0);
+  });
+});
+
+describe('track words and shares', () => {
+  const floor = trackReading(quietVerdict('central'));
+  const ceiling = trackReading(flowingVerdict('victoria'));
+  const minutes = trackReading(gapsVerdict('central'));
+
+  it('states the rule in words for each kind of threshold', () => {
+    expect(floor && trackCaption(floor)).toBe('Needs at least 3 trains');
+    expect(ceiling && trackCaption(ceiling)).toBe('Alarm at 6 trains or more');
+    expect(minutes && trackCaption(minutes)).toBe('Alarm at 15 minutes apart or more');
+  });
+
+  it('describes the whole track in one sentence', () => {
+    expect(floor && trackDescription(floor)).toBe(
+      '1 train due in 15 minutes. Needs at least 3 trains.',
+    );
+    expect(minutes && trackDescription(minutes)).toBe(
+      'Trains about 18 minutes apart. Alarm at 15 minutes apart or more.',
+    );
+  });
+
+  it('places the fill and the tick as shares of the axis', () => {
+    expect(floor && trackShares(floor)).toEqual({ fill: 1 / 24, tick: 3 / 24 });
+  });
+
+  it('never draws past the ends of the axis', () => {
+    const busy = verdict('central', {
+      observed: {
+        vehicles15: 90,
+        vehicles30: 99,
+        inbound15: 45,
+        outbound15: 45,
+        headwaySec: 120,
+        platformsMeasured: 40,
+      },
+    });
+    const reading = trackReading(busy);
+    expect(reading && trackShares(reading).fill).toBe(1);
   });
 });

@@ -47,7 +47,7 @@ export function Hero({
           />
         )}
         {counts.unknown > 0 && (
-          <span className="hero__note">
+          <span className="pill">
             {counts.unknown} {counts.unknown === 1 ? 'line' : 'lines'} could not be
             checked
           </span>

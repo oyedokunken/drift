@@ -1,59 +1,30 @@
-import type { Verdict } from '@drift/shared';
-import { trackPositions } from '../lib/view.ts';
+import {
+  trackCaption,
+  trackDescription,
+  trackShares,
+  type TrackReading,
+} from '../lib/view.ts';
 
-const percent = (value: number): string => `${(value * 100).toFixed(1)}%`;
-
-function describe(observed: number | null, official: number): string {
-  if (observed === null)
-    return 'Not enough data to compare the official status with live trains.';
-  return Math.abs(observed - official) < 0.05
-    ? 'The official status and the live trains agree.'
-    : 'The official status and the live trains are far apart.';
-}
+const percent = (share: number): string => `${(share * 100).toFixed(1)}%`;
 
 /**
- * A small track that places the official status (a ring) and the live reading (a dot) on
- * one scale from no service to full service. The gap between them is the drift.
+ * One measured value against the engine's threshold. The bar fills up to the observed
+ * value and a tall tick marks the threshold, with the rule in words beneath. The
+ * caption says which side of the tick is expected, so the shape never has to be read
+ * by colour.
  */
-export function DriftTrack({
-  verdict,
-  showEnds = false,
-}: {
-  readonly verdict: Verdict;
-  readonly showEnds?: boolean;
-}) {
-  const { official, observed } = trackPositions(verdict);
-  const left = observed === null ? official : Math.min(official, observed);
-  const width = observed === null ? 0 : Math.abs(observed - official);
+export function DriftTrack({ reading }: { readonly reading: TrackReading }) {
+  const { fill, tick } = trackShares(reading);
 
   return (
-    <div className={`track${observed === null ? ' track--ghost' : ''}`}>
-      <div className="track__rail" role="img" aria-label={describe(observed, official)}>
-        {width > 0.05 && (
-          <span
-            className="track__gap"
-            style={{ left: percent(left), width: percent(width) }}
-          />
-        )}
-        {observed !== null && (
-          <span
-            className="track__marker track__marker--official"
-            style={{ left: percent(official) }}
-          />
-        )}
-        {observed !== null && (
-          <span
-            className="track__marker track__marker--observed"
-            style={{ left: percent(observed) }}
-          />
-        )}
+    <div className="track" data-limit={reading.limit}>
+      <div className="track__rail" role="img" aria-label={trackDescription(reading)}>
+        <span className="track__fill" style={{ width: percent(fill) }} />
+        <span className="track__tick" style={{ left: percent(tick) }} />
       </div>
-      {showEnds && (
-        <div className="track__ends" aria-hidden="true">
-          <span>No service</span>
-          <span>Full service</span>
-        </div>
-      )}
+      <p className="track__caption" aria-hidden="true">
+        {trackCaption(reading)}
+      </p>
     </div>
   );
 }

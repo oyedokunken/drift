@@ -1,3 +1,4 @@
+import { config } from '@drift/engine';
 import type { LineId, Verdict } from '@drift/shared';
 
 interface LineNames {
@@ -97,55 +98,133 @@ export const CONFIDENCE_LABEL: Readonly<Record<Verdict['confidence'], string>> =
   low: 'Low confidence',
 };
 
-const trains = (count: number): string => `${count} ${count === 1 ? 'train' : 'trains'}`;
+/** The number that decided a verdict, with a short label to print beneath it. */
+export interface LiveFigure {
+  readonly value: number;
+  readonly label: string;
+}
 
-/** What the live data showed, in one short plain phrase. */
-export function observedText(verdict: Verdict): string {
+/** What the live data showed: trains due soon, or the gap between trains for wide gaps. */
+export function liveFigure(verdict: Verdict): LiveFigure | null {
   const { observed } = verdict;
-  if (observed === null) return 'No live reading';
+  if (observed === null) return null;
   if (verdict.ruleId === 'wide-gaps' && observed.headwaySec !== null) {
-    return `Trains about ${Math.round(observed.headwaySec / 60)} minutes apart`;
+    return {
+      value: Math.round(observed.headwaySec / 60),
+      label: 'minutes between trains',
+    };
   }
-  return `${trains(observed.vehicles15)} due within 15 minutes`;
+  const { vehicles15 } = observed;
+  return {
+    value: vehicles15,
+    label: vehicles15 === 1 ? 'train due in 15 min' : 'trains due in 15 min',
+  };
 }
 
 /**
- * Where the two markers sit on a drift track, from 0 (no service) to 1 (full service).
- * The official marker comes from the status. The observed marker comes from the metric
- * that decided the verdict. The track illustrates the shape and size of the
- * disagreement, it is not a measured scale.
+ * One measured value against the engine's own threshold, for the drift track. Nothing
+ * here is illustrative: `value` and `threshold` are in the same unit and `domain` is
+ * only the width of the axis.
+ *
+ * A `floor` is a minimum: fewer than the threshold raises a mismatch while service is
+ * good. A `ceiling` is a maximum: the threshold or more raises a mismatch while service
+ * is stopped, or while trains are too far apart.
  */
-export interface TrackPositions {
-  readonly official: number;
-  readonly observed: number | null;
+export interface TrackReading {
+  readonly unit: 'trains' | 'minutes';
+  readonly value: number;
+  readonly threshold: number;
+  readonly domain: number;
+  readonly limit: 'floor' | 'ceiling';
 }
 
-const RUNNING = 0.88;
-const STOPPED = 0.1;
+/** The axis runs to twice the "clearly flowing" count, so healthy lines fill most of it. */
+const TRAINS_DOMAIN = config.FLOWING_HIGH_VEHICLES * 2;
 
-export function trackPositions(verdict: Verdict): TrackPositions {
-  const { observed } = verdict;
-  if (verdict.outcome === 'unknown' || observed === null) {
-    return { official: RUNNING, observed: null };
-  }
-
-  const suspended = verdict.ruleId === 'flowing-while-suspended' || isDown(verdict);
-  const official = suspended ? STOPPED : RUNNING;
-  if (verdict.outcome === 'match') return { official, observed: official };
-
-  switch (verdict.ruleId) {
-    case 'quiet-while-good':
-      return { official, observed: 0.08 + 0.22 * Math.min(1, observed.vehicles15 / 3) };
-    case 'wide-gaps':
-      return { official, observed: 0.4 };
-    case 'flowing-while-suspended':
-      return { official, observed: 0.55 + 0.35 * Math.min(1, observed.vehicles15 / 20) };
-    default:
-      return { official, observed: official };
-  }
-}
+/** The axis runs to twice the wide gap threshold, past the "unambiguous" gap. */
+const MINUTES_DOMAIN = (config.WIDE_HEADWAY_SEC * 2) / 60;
 
 /** Suspended, Closed and Not Running read as "should be stopped". */
 function isDown(verdict: Verdict): boolean {
   return [1, 2, 16, 20].includes(verdict.official.severity);
+}
+
+function trainsReading(verdict: Verdict, vehicles15: number): TrackReading {
+  if (verdict.ruleId === 'flowing-while-suspended' || isDown(verdict)) {
+    return {
+      unit: 'trains',
+      value: vehicles15,
+      threshold: config.FLOWING_MIN_VEHICLES,
+      domain: TRAINS_DOMAIN,
+      limit: 'ceiling',
+    };
+  }
+  return {
+    unit: 'trains',
+    value: vehicles15,
+    threshold:
+      config.QUIET_MIN_VEHICLES_BY_LINE[verdict.lineId] ?? config.QUIET_MIN_VEHICLES,
+    domain: TRAINS_DOMAIN,
+    limit: 'floor',
+  };
+}
+
+/**
+ * The reading to draw, or null when no honest comparison exists: no live data, a status
+ * live traffic cannot judge, closed hours, or the lopsided directions case, which is
+ * decided by direction rather than by the count the track would show.
+ */
+export function trackReading(verdict: Verdict): TrackReading | null {
+  const { observed } = verdict;
+  if (observed === null || verdict.outcome === 'unknown') return null;
+  if (verdict.ruleId === 'closed-hours') return null;
+
+  if (verdict.ruleId === 'wide-gaps') {
+    if (observed.headwaySec === null) return null;
+    return {
+      unit: 'minutes',
+      value: Math.round(observed.headwaySec / 60),
+      threshold: config.WIDE_HEADWAY_SEC / 60,
+      domain: MINUTES_DOMAIN,
+      limit: 'ceiling',
+    };
+  }
+
+  const reading = trainsReading(verdict, observed.vehicles15);
+  const lopsided =
+    verdict.outcome === 'mismatch' &&
+    reading.limit === 'floor' &&
+    reading.value >= reading.threshold;
+  return lopsided ? null : reading;
+}
+
+const plural = (count: number, unit: string): string =>
+  `${count} ${unit}${count === 1 ? '' : 's'}`;
+
+const quantity = (count: number, unit: TrackReading['unit']): string =>
+  unit === 'trains' ? plural(count, 'train') : plural(count, 'minute');
+
+/** The rule of the threshold, in words, printed under the track. */
+export function trackCaption(reading: TrackReading): string {
+  const amount = quantity(reading.threshold, reading.unit);
+  if (reading.unit === 'minutes') return `Alarm at ${amount} apart or more`;
+  return reading.limit === 'floor'
+    ? `Needs at least ${amount}`
+    : `Alarm at ${amount} or more`;
+}
+
+/** The whole track as one sentence, for people who cannot see it. */
+export function trackDescription(reading: TrackReading): string {
+  const measured =
+    reading.unit === 'trains'
+      ? `${plural(reading.value, 'train')} due in 15 minutes`
+      : `Trains about ${plural(reading.value, 'minute')} apart`;
+  return `${measured}. ${trackCaption(reading)}.`;
+}
+
+/** Where the fill ends and the threshold sits, as shares of the axis from 0 to 1. */
+export function trackShares(reading: TrackReading): { fill: number; tick: number } {
+  const share = (amount: number): number =>
+    Math.min(1, Math.max(0, amount / reading.domain));
+  return { fill: share(reading.value), tick: share(reading.threshold) };
 }

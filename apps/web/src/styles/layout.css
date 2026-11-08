@@ -200,12 +200,11 @@ main {
 
 .footer__mark {
   position: absolute;
-  top: 50%;
-  left: -4rem;
-  width: min(110vw, 30rem);
+  right: -4rem;
+  bottom: -3rem;
+  width: min(100vw, 28rem);
   height: auto;
   opacity: 0.12;
-  transform: translateY(-50%);
   pointer-events: none;
 }
 

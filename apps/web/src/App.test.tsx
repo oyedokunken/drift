@@ -74,8 +74,11 @@ describe('with mismatches', () => {
     if (!central) return;
     expect(within(central).getByText('Drift detected')).toBeInTheDocument();
     expect(within(central).getByText('Good Service')).toBeInTheDocument();
+    expect(within(central).getByText('train due in 15 min')).toBeInTheDocument();
     expect(
-      within(central).getByText('1 train due within 15 minutes'),
+      within(central).getByRole('img', {
+        name: '1 train due in 15 minutes. Needs at least 3 trains.',
+      }),
     ).toBeInTheDocument();
     expect(within(central).getByText(/only 1 train is due/)).toBeInTheDocument();
     expect(within(central).getByText('Rule: Quiet while good')).toBeInTheDocument();
