@@ -1,4 +1,6 @@
-# Drift
+<p align="center">
+  <img src="brand/logo.svg" alt="Drift" width="180">
+</p>
 
 **Where the official status and the real network drift apart.**
 
@@ -6,8 +8,6 @@ Drift is a live page that checks whether Transport for London's official Tube li
 status matches what the trains are actually doing. TfL says a line has Good Service,
 Drift looks at the live train predictions, and if the two disagree it says so, with
 the rule that fired, a plain reason and how confident it is.
-
-**Live:** https://drift.oyedokunken.workers.dev
 
 | Live, on a phone                                      | Live, on a desktop                                       |
 | ----------------------------------------------------- | -------------------------------------------------------- |
@@ -36,15 +36,13 @@ thin, missing or ambiguous, Drift says "not enough data" rather than guessing.
 ## How it works
 
 ```mermaid
-flowchart LR
+flowchart TB
   subgraph cron["Every minute (cron)"]
-    direction LR
     sched["Worker.scheduled"] --> arrivals["5 parallel TfL Arrivals fetches"]
     arrivals --> parse["parse, Zod, summarise()"]
   end
 
   subgraph request["On each visitor request"]
-    direction LR
     status["TfL Status (13 KB)"] --> evaluate["evaluate() in the engine"]
     evaluate --> snapshot["snapshot"]
     snapshot --> cache["Cache API (45 s)"]
