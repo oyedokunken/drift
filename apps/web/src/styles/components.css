@@ -362,9 +362,9 @@
   border-radius: var(--radius-s);
   background: linear-gradient(
     90deg,
-    var(--grey-200) 0%,
-    var(--grey-50) 50%,
-    var(--grey-200) 100%
+    rgb(255 255 255 / 0.1) 0%,
+    rgb(255 255 255 / 0.22) 50%,
+    rgb(255 255 255 / 0.1) 100%
   );
   background-size: 200% 100%;
   animation: shimmer 1.6s linear infinite;
@@ -377,18 +377,31 @@
 }
 
 .skeleton--title {
-  height: 3.25rem;
-  max-width: 22rem;
+  /* Four lines of the headline on a phone, three on wider screens. */
+  height: calc(var(--step-4) * 1.02 * 4);
+  max-width: 28rem;
+}
+
+.hero__meta-space {
+  /* Three stacked pills on a phone, one row of them on wider screens. */
+  min-height: 7.5rem;
+  margin-top: var(--space-5);
 }
 
 .skeleton--line {
-  height: 1.1rem;
+  height: 2.1rem;
   max-width: 12rem;
-  margin-top: var(--space-4);
+  border-radius: var(--radius-pill);
 }
 
-.skeleton--row {
-  height: 5.5rem;
+@media (min-width: 48rem) {
+  .skeleton--title {
+    height: calc(var(--step-4) * 1.02 * 3);
+  }
+
+  .hero__meta-space {
+    min-height: 2.1rem;
+  }
 }
 
 .panel {
@@ -429,14 +442,4 @@
 .button:disabled {
   opacity: 0.6;
   cursor: progress;
-}
-
-.hero .skeleton {
-  background: linear-gradient(
-    90deg,
-    rgb(255 255 255 / 0.1) 0%,
-    rgb(255 255 255 / 0.22) 50%,
-    rgb(255 255 255 / 0.1) 100%
-  );
-  background-size: 200% 100%;
 }

@@ -19,26 +19,37 @@ export function Banner({
   );
 }
 
-/** The hero band while the first answer is on its way. */
+/**
+ * The hero band while the first answer is on its way. It is sized like a typical real
+ * headline and row of pills (see `.skeleton--title` and `.hero__meta-space`), so the
+ * page below barely moves when the data arrives.
+ */
 export function HeroSkeleton() {
   return (
     <div className="hero" aria-hidden="true">
       <div className="skeleton skeleton--title" />
-      <div className="skeleton skeleton--line" />
+      <div className="hero__meta-space">
+        <div className="skeleton skeleton--line" />
+      </div>
     </div>
   );
 }
 
-/** Shown on the very first load, shaped like the list that is coming. */
+/**
+ * Announced on the very first load. Nothing visible sits under the hero band while it
+ * waits: the band grows to the height of the real headline, and any placeholder below
+ * it would be pushed down by that growth, which the page would count as a layout shift.
+ */
 export function LoadingSkeleton() {
   return (
-    <div aria-busy="true" aria-label="Loading live data" role="status">
-      <div className="stack">
-        {[1, 2, 3, 4, 5].map((n) => (
-          <div key={n} className="skeleton skeleton--row" />
-        ))}
-      </div>
-    </div>
+    <p
+      className="visually-hidden"
+      aria-busy="true"
+      aria-label="Loading live data"
+      role="status"
+    >
+      Loading live data
+    </p>
   );
 }
 
