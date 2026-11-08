@@ -9,6 +9,7 @@ export interface CacheLike {
 }
 
 export interface AppDeps {
+  readonly now: () => Date;
   readonly snapshot: { get(): Promise<SnapshotResult> };
   readonly cache: CacheLike;
   /** Serves the built web app. */
@@ -39,11 +40,25 @@ function apiError(
   return response;
 }
 
+/**
+ * The Worker's clock at the moment of replying. A cached snapshot can be 45 seconds old,
+ * so the browser cannot learn the server time from the snapshot or the Date header.
+ */
+function withServerTime(response: Response, deps: AppDeps): Response {
+  response.headers.set('X-Server-Time', deps.now().toISOString());
+  return response;
+}
+
 async function snapshotResponse(request: Request, deps: AppDeps): Promise<Response> {
   const cacheKey = new Request(new URL('/api/snapshot', request.url));
 
   const hit = await deps.cache.match(cacheKey);
-  if (hit) return secured(new Response(await hit.text(), hit), CACHE.snapshot);
+  if (hit) {
+    return withServerTime(
+      secured(new Response(await hit.text(), hit), CACHE.snapshot),
+      deps,
+    );
+  }
 
   const result = await deps.snapshot.get();
   if (result.kind === 'unavailable') {
@@ -65,12 +80,10 @@ async function snapshotResponse(request: Request, deps: AppDeps): Promise<Respon
     await deps.cache.put(cacheKey, stored);
   }
   const cacheControl = result.kind === 'fresh' ? CACHE.snapshot : CACHE.none;
-  return secured(
-    new Response(body, {
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
-    }),
-    cacheControl,
-  );
+  const response = new Response(body, {
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+  });
+  return withServerTime(secured(response, cacheControl), deps);
 }
 
 async function assetResponse(request: Request, deps: AppDeps): Promise<Response> {

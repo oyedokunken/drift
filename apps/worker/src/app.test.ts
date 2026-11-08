@@ -39,6 +39,7 @@ function setup(status: () => Response) {
   });
   const assetCalls: string[] = [];
   const app = createApp({
+    now: () => NOW,
     snapshot,
     cache,
     assets: (request) => {
@@ -102,6 +103,27 @@ describe('API routes', () => {
     expect(response.headers.get('Allow')).toBe('GET');
     expect(apiErrorSchema.parse(await response.json()).error.code).toBe(
       'method_not_allowed',
+    );
+  });
+});
+
+describe('server time', () => {
+  it('stamps every snapshot response with the Worker clock, cached or not', async () => {
+    const { get } = setup(healthy);
+    const first = await get('/api/snapshot');
+    const second = await get('/api/snapshot');
+    expect(first.headers.get('X-Server-Time')).toBe(NOW.toISOString());
+    expect(second.headers.get('X-Server-Time')).toBe(NOW.toISOString());
+  });
+
+  it('also stamps a stale fallback', async () => {
+    let up = true;
+    const { get, cache } = setup(() => (up ? healthy() : down()));
+    await get('/api/snapshot');
+    cache.entries.clear();
+    up = false;
+    expect((await get('/api/snapshot')).headers.get('X-Server-Time')).toBe(
+      NOW.toISOString(),
     );
   });
 });

@@ -17,6 +17,7 @@ function getApp(env: Env): (request: Request) => Promise<Response> {
   if (app) return app;
   const { log, upstream } = productionRuntime(env);
   app = createApp({
+    now: () => new Date(),
     snapshot: createSnapshotService({
       upstream,
       log,
