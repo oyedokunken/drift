@@ -1,0 +1,3 @@
+# A fabricated sentinel used by the worker tests to prove the real key never leaks.
+# It is not a credential. The value was later replaced with an obviously fake one.
+566fb3c3b633af84f084180de41e06f99ad7af3f:apps/worker/test/helpers.ts:generic-api-key:7
