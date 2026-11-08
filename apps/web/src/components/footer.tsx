@@ -14,10 +14,10 @@ export function Footer() {
         prompt to look closer.
       </p>
       <nav className="footer__links" aria-label="Project links">
-        <a href={LICENCE_URL} rel="noreferrer">
+        <a href={LICENCE_URL} target="_blank" rel="noopener noreferrer">
           TfL open data licence
         </a>
-        <a href={REPO_URL} rel="noreferrer">
+        <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
           Source on GitHub
         </a>
       </nav>

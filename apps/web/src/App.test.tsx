@@ -264,4 +264,17 @@ describe('footer', () => {
       'https://github.com/oyedokunken/drift',
     );
   });
+
+  it('opens both links in a new tab without leaking the opener', () => {
+    stubFetch(() => new Promise<Response>(() => undefined));
+    renderApp();
+    const links = within(
+      screen.getByRole('navigation', { name: 'Project links' }),
+    ).getAllByRole('link');
+    expect(links).toHaveLength(2);
+    for (const link of links) {
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    }
+  });
 });
