@@ -1,0 +1,359 @@
+/* ---- Outcome treatments --------------------------------------------------------
+   Mismatch: deep blue fill, white text.
+   Match: white surface, hairline border.
+   Unknown: grey dashed outline.
+   Each also carries its own icon and label, so colour is never the only signal. */
+
+.chip {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border: 1.5px solid currentColor;
+  border-radius: var(--radius-s);
+  font-size: var(--step--1);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.4;
+}
+
+.verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--step--1);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.verdict svg {
+  flex: none;
+}
+
+[data-outcome='mismatch'] .verdict {
+  padding: 0.35rem 0.75rem 0.35rem 0.6rem;
+  border-radius: var(--radius-pill);
+  background: var(--white);
+  color: var(--blue-900);
+}
+
+[data-outcome='match'] .verdict {
+  color: var(--blue-900);
+}
+
+[data-outcome='unknown'] .verdict {
+  color: var(--text-muted);
+}
+
+/* ---- Mismatch cards ---------------------------------------------------------- */
+
+.card {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border-radius: var(--radius-m);
+  background: var(--blue-900);
+  color: var(--white);
+}
+
+.card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+}
+
+.card__name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--step-1);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.card__compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+.compare__label {
+  color: var(--blue-200);
+  font-size: var(--step--1);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.compare__value {
+  margin-top: var(--space-1);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.card__reason {
+  max-width: 36rem;
+}
+
+.card__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid rgb(191 215 255 / 0.3);
+  color: var(--blue-200);
+  font-size: var(--step--1);
+}
+
+.card__rule {
+  font-weight: 600;
+}
+
+.meter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+}
+
+.meter__pips {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.meter__pip {
+  width: 0.5rem;
+  height: 1rem;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+}
+
+.meter__pip[data-on='true'] {
+  background: currentColor;
+}
+
+/* ---- Drift track ------------------------------------------------------------- */
+
+.track {
+  --track-color: var(--blue-200);
+}
+
+.track__rail {
+  position: relative;
+  height: 1.25rem;
+  margin-inline: 0.4rem;
+}
+
+.track__rail::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  top: 50%;
+  height: 2px;
+  background: currentColor;
+  opacity: 0.3;
+}
+
+.track__gap {
+  position: absolute;
+  top: 50%;
+  height: 4px;
+  margin-top: -2px;
+  border-radius: 2px;
+  background: var(--track-color);
+}
+
+.track__marker {
+  position: absolute;
+  top: 50%;
+  width: 0.9rem;
+  height: 0.9rem;
+  margin: -0.45rem 0 0 -0.45rem;
+  border-radius: 50%;
+}
+
+.track__marker--official {
+  border: 2px solid currentColor;
+  background: transparent;
+}
+
+.track__marker--observed {
+  background: var(--track-color);
+  border: 2px solid transparent;
+}
+
+.track__ends {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--space-1);
+  font-size: var(--step--1);
+  opacity: 0.8;
+}
+
+.track--ghost .track__rail::before {
+  border-top: 2px dashed currentColor;
+  background: none;
+  height: 0;
+}
+
+/* ---- Compact line rows ------------------------------------------------------- */
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-2) var(--space-4);
+  align-items: center;
+  padding: var(--space-4);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-s);
+  background: var(--surface);
+}
+
+.row[data-outcome='mismatch'] {
+  border-color: var(--blue-900);
+  background: var(--blue-900);
+  color: var(--white);
+}
+
+.row[data-outcome='unknown'] {
+  border: 1.5px dashed var(--grey-500);
+  background: transparent;
+}
+
+.row__name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--step-1);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.row__side {
+  display: grid;
+  gap: 0.15rem;
+  grid-column: 1 / -1;
+  font-size: var(--step--1);
+  line-height: 1.35;
+}
+
+.row__label {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.row[data-outcome='mismatch'] .row__label {
+  color: var(--blue-200);
+}
+
+.row__track {
+  grid-column: 1 / -1;
+}
+
+.row[data-outcome='mismatch'] .track {
+  --track-color: var(--blue-200);
+}
+
+.row:not([data-outcome='mismatch']) .track {
+  --track-color: var(--blue-600);
+}
+
+@media (min-width: 48rem) {
+  .row {
+    grid-template-columns: minmax(11rem, 1.2fr) 1.1fr 1.3fr minmax(8rem, 1fr) 9.5rem;
+    gap: var(--space-4);
+  }
+
+  .row__side {
+    grid-column: auto;
+  }
+
+  .row__track {
+    grid-column: auto;
+  }
+
+  .row .track__ends {
+    display: none;
+  }
+
+  .row__verdict {
+    justify-self: end;
+  }
+}
+
+/* ---- Loading, errors --------------------------------------------------------- */
+
+.skeleton {
+  border-radius: var(--radius-s);
+  background: linear-gradient(
+    90deg,
+    var(--grey-200) 0%,
+    var(--grey-50) 50%,
+    var(--grey-200) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton--title {
+  height: 3.25rem;
+  max-width: 22rem;
+}
+
+.skeleton--line {
+  height: 1.1rem;
+  max-width: 12rem;
+  margin-top: var(--space-4);
+}
+
+.skeleton--row {
+  height: 5.5rem;
+}
+
+.panel {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+  margin-top: var(--space-5);
+  padding: var(--space-5);
+  border: 1.5px dashed var(--grey-500);
+  border-radius: var(--radius-m);
+}
+
+.panel__title {
+  font-size: var(--step-1);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 7.5rem;
+  min-height: 2.75rem;
+  padding: 0 var(--space-5);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--blue-900);
+  color: var(--white);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--blue-600);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}

@@ -1,0 +1,53 @@
+/*
+ * Design tokens. The palette is three blues plus white, black and grey. Pairs used for
+ * text are checked against WCAG AA by src/styles/tokens.test.ts.
+ */
+:root {
+  /* Palette */
+  --blue-900: #0b2a6f;
+  --blue-600: #2563eb;
+  --blue-200: #bfd7ff;
+  --white: #ffffff;
+  --ink: #0a0b0f;
+  --grey-50: #f5f6f8;
+  --grey-200: #e3e6eb;
+  --grey-500: #6b7280;
+  --grey-700: #374151;
+
+  /* Roles */
+  --surface: var(--white);
+  --surface-sunken: var(--grey-50);
+  --text: var(--ink);
+  --text-muted: var(--grey-700);
+  --hairline: var(--grey-200);
+  --accent: var(--blue-600);
+  --accent-deep: var(--blue-900);
+  --accent-soft: var(--blue-200);
+
+  /* Space, on a 4px grid */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4.5rem;
+
+  --radius-s: 0.5rem;
+  --radius-m: 1rem;
+  --radius-pill: 62.5rem;
+
+  /* Type: Urbanist only, on a fluid scale */
+  --font: 'Urbanist Variable', 'Urbanist Fallback', system-ui, sans-serif;
+  --step--1: clamp(0.8125rem, 0.79rem + 0.1vw, 0.875rem);
+  --step-0: clamp(1rem, 0.97rem + 0.15vw, 1.0625rem);
+  --step-1: clamp(1.1875rem, 1.1rem + 0.45vw, 1.375rem);
+  --step-2: clamp(1.5rem, 1.3rem + 1vw, 2rem);
+  --step-3: clamp(2.125rem, 1.6rem + 2.6vw, 3.5rem);
+
+  /* Layout and motion */
+  --page-max: 62rem;
+  --gutter: max(1rem, 5vw);
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}
