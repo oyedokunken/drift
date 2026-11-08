@@ -45,9 +45,23 @@ export class DriftStore extends DurableObject<Env> implements Store {
     return Promise.resolve(parsed.success ? parsed.data : null);
   }
 
-  /** Called by the cron trigger every minute. */
+  private inflight: Promise<RefreshReport> | null = null;
+
+  /**
+   * Called by the cron trigger every minute and by the request path on a cold start.
+   * Callers that arrive while a refresh runs share it, so a burst of visitors on an
+   * empty store costs one round of TfL fetches.
+   */
   refresh(): Promise<RefreshReport> {
     const { log, upstream } = productionRuntime(this.env);
-    return refreshSummaries({ upstream, store: this, log, now: () => new Date() });
+    this.inflight ??= refreshSummaries({
+      upstream,
+      store: this,
+      log,
+      now: () => new Date(),
+    }).finally(() => {
+      this.inflight = null;
+    });
+    return this.inflight;
   }
 }

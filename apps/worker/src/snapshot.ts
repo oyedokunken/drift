@@ -10,7 +10,15 @@ export interface SnapshotDeps {
   readonly store: Store;
   readonly log: Logger;
   readonly now: () => Date;
+  /**
+   * Fetches line summaries when the store has none, as on the first request after a
+   * deploy or on empty storage. Optional, so tests and callers without a refresher work.
+   */
+  readonly warmUp?: () => Promise<unknown>;
 }
+
+/** The longest a visitor waits for a cold start refresh. The browser gives up at 10 s. */
+export const WARM_UP_TIMEOUT_MS = 7_000;
 
 export type SnapshotResult =
   | { readonly kind: 'fresh'; readonly snapshot: Snapshot }
@@ -33,6 +41,24 @@ async function loadSummaries(deps: SnapshotDeps): Promise<ArrivalSummary[]> {
   }
 }
 
+/**
+ * With no stored summaries every line would read "no live data" until the next cron
+ * tick. Run one refresh now instead, within a time cap. Any failure leaves the store as
+ * it was, and the snapshot is built from whatever is there.
+ */
+async function warmUp(deps: SnapshotDeps): Promise<void> {
+  if (deps.warmUp === undefined) return;
+  deps.log('info', 'cold_start_refresh', {});
+  const timeout = deps.upstream.sleep(WARM_UP_TIMEOUT_MS).then(() => {
+    deps.log('warn', 'cold_start_refresh_timed_out', {});
+  });
+  try {
+    await Promise.race([deps.warmUp(), timeout]);
+  } catch (error) {
+    deps.log('error', 'cold_start_refresh_failed', { reason: reason(error) });
+  }
+}
+
 async function lastGood(deps: SnapshotDeps): Promise<Snapshot | null> {
   try {
     return await deps.store.loadSnapshot();
@@ -49,7 +75,11 @@ function reason(error: unknown): string {
 async function build(deps: SnapshotDeps): Promise<SnapshotResult> {
   try {
     const statuses = await fetchStatuses(deps.upstream);
-    const summaries = await loadSummaries(deps);
+    let summaries = await loadSummaries(deps);
+    if (summaries.length === 0) {
+      await warmUp(deps);
+      summaries = await loadSummaries(deps);
+    }
     const now = deps.now();
 
     const snapshot: Snapshot = {

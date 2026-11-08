@@ -10,7 +10,7 @@ import {
   statusBody,
   upstreamOptions,
 } from '../test/helpers.ts';
-import { createSnapshotService } from './snapshot.ts';
+import { WARM_UP_TIMEOUT_MS, createSnapshotService } from './snapshot.ts';
 
 const NOW = new Date('2026-11-08T09:00:00Z');
 
@@ -186,5 +186,93 @@ describe('snapshot service', () => {
       expect((await service.get()).kind).toBe('fresh');
       expect(calls.length).toBeGreaterThan(1);
     });
+  });
+});
+
+describe('cold start', () => {
+  const never = () => new Promise<void>(() => undefined);
+
+  function coldSetup(
+    warmUp: (store: ReturnType<typeof memoryStore>) => Promise<unknown>,
+    sleep: (ms: number) => Promise<void> = never,
+  ) {
+    const { fetch, calls } = fakeFetch(() => json(statusBody(['central'])));
+    const { log, lines } = collectLogs();
+    const store = memoryStore();
+    const upstream = upstreamOptions(fetch, log, { sleep });
+    const warmUps = { count: 0 };
+    const service = createSnapshotService({
+      upstream,
+      store,
+      log,
+      now: () => NOW,
+      warmUp: () => {
+        warmUps.count += 1;
+        return warmUp(store);
+      },
+    });
+    return { service, store, calls, lines, warmUps };
+  }
+
+  it('refreshes once when the store has no summaries, then uses them', async () => {
+    const { service, warmUps, lines } = coldSetup((store) =>
+      store.saveSummaries([summary('central')]),
+    );
+    const result = await service.get();
+    expect(warmUps.count).toBe(1);
+    expect(result.kind === 'fresh' && result.snapshot.verdicts[0]).toMatchObject({
+      outcome: 'match',
+    });
+    expect(lines.some((l) => l.includes('cold_start_refresh'))).toBe(true);
+  });
+
+  it('does not refresh when summaries are already stored', async () => {
+    const { service, store, warmUps } = coldSetup(() => Promise.resolve());
+    await store.saveSummaries([summary('central')]);
+    await service.get();
+    expect(warmUps.count).toBe(0);
+  });
+
+  it('shares one refresh between concurrent requests on an empty store', async () => {
+    const { service, warmUps } = coldSetup((store) =>
+      store.saveSummaries([summary('central')]),
+    );
+    await Promise.all([service.get(), service.get(), service.get()]);
+    expect(warmUps.count).toBe(1);
+  });
+
+  it('serves an unknown snapshot, not an error, when the refresh fails', async () => {
+    const { service, lines } = coldSetup(() => Promise.reject(new Error('TfL down')));
+    const result = await service.get();
+    expect(result.kind === 'fresh' && result.snapshot.verdicts[0]).toMatchObject({
+      outcome: 'unknown',
+      ruleId: 'no-arrivals',
+    });
+    expect(lines.some((l) => l.includes('cold_start_refresh_failed'))).toBe(true);
+  });
+
+  it('stops waiting for a slow refresh after the time cap', async () => {
+    const waits: number[] = [];
+    const { service, lines } = coldSetup(never, (ms) => {
+      waits.push(ms);
+      return Promise.resolve();
+    });
+    const result = await service.get();
+    expect(waits).toContain(WARM_UP_TIMEOUT_MS);
+    expect(result.kind).toBe('fresh');
+    expect(lines.some((l) => l.includes('cold_start_refresh_timed_out'))).toBe(true);
+  });
+
+  it('still reports unavailable when TfL status is down and nothing is stored', async () => {
+    const { fetch } = fakeFetch(() => new Response('down', { status: 503 }));
+    const { log } = collectLogs();
+    const service = createSnapshotService({
+      upstream: upstreamOptions(fetch, log, { maxAttempts: 1, sleep: never }),
+      store: memoryStore(),
+      log,
+      now: () => NOW,
+      warmUp: () => Promise.resolve(),
+    });
+    expect((await service.get()).kind).toBe('unavailable');
   });
 });

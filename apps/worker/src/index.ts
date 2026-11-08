@@ -22,6 +22,7 @@ function getApp(env: Env): (request: Request) => Promise<Response> {
       upstream,
       log,
       now: () => new Date(),
+      warmUp: () => storeStub(env).refresh(),
       store: {
         saveSummaries: (summaries) => storeStub(env).saveSummaries(summaries),
         loadSummaries: () => storeStub(env).loadSummaries(),
