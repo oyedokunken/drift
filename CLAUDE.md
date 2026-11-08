@@ -34,10 +34,12 @@ without having run it.
 
 ```
 apps/web          Vite, React, TypeScript, Framer Motion. The interface.
-apps/worker       Cloudflare Worker. Serves /api/* and the built web app.
+apps/worker       Cloudflare Worker and Durable Object. Serves /api/*, the built
+                  web app, and a cron refresh of the line summaries.
 packages/engine   Pure TypeScript mismatch engine. No I/O, no global clock.
 packages/shared   Zod schemas and types shared by worker and web.
 docs/             Architecture, rules, API notes, prompts, verification.
+brand/            SVG sources for the logo, mark and social image.
 scripts/          Brand asset generation (SVG to PNG and ICO).
 .github/          CI workflow and templates.
 ```
@@ -55,8 +57,10 @@ scripts/          Brand asset generation (SVG to PNG and ICO).
    UI that takes no input.
 5. Zod validates every boundary: TfL responses in the worker, the snapshot in
    the browser, and any user input.
-6. Framer Motion only for animation, via `LazyMotion` with `m` components and
-   `domAnimation`. Wrap the app in `MotionConfig reducedMotion="user"`.
+6. Framer Motion only for animation, via `LazyMotion` with `m` components. The
+   features are `domMax`, loaded lazily after first paint, because the layout
+   animation that reorders lines exists only in `domMax`. See "Deviations from the
+   plan" in the README. Wrap the app in `MotionConfig reducedMotion="user"`.
 7. Font is Urbanist, self-hosted with `@fontsource-variable/urbanist`, latin
    subset, preloaded. No third party font request.
 8. Real history: small Conventional Commits. No squashing, no force pushes, no
