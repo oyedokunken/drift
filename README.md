@@ -1,6 +1,7 @@
-<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="brand/logo-white.svg">
   <img src="brand/logo.svg" alt="Drift" width="180">
-</p>
+</picture>
 
 **Where the official status and the real network drift apart.**
 
@@ -216,20 +217,48 @@ Said plainly, so nothing here is a surprise.
   too irregular for the wide gaps rule to be trustworthy. DLR has no vehicle ids in its
   feed, so trains cannot be counted.
 - **No dark theme.**
-- **The outage test was not run on production, by decision.** Simulating TfL being down
-  would mean overwriting the live secret with an invalid one, and the owner chose not to
-  do that on the live site. The same behaviour was exercised against the real TfL API on
-  a local Worker with real persisted storage (success, stale fallback, typed 503), and is
-  covered by unit tests. That local verification stands as the evidence.
-- **Forced timeout was only unit tested**, not exercised against a local Worker.
-- **An uncached `/api/snapshot` costs 8 to 19 ms of CPU**, above the documented 10 ms
-  free tier figure, which Cloudflare did not enforce. The 45 second cache means most
-  requests cost 1 to 2 ms.
+- **I did not run the outage test on production.** Simulating TfL being down would
+  mean overwriting the live secret with an invalid one, and I chose not to do that on the
+  live site. Instead I exercised the same behaviour against the real TfL API on a local
+  Worker with real persisted storage (success, stale fallback, typed 503), and it is
+  covered by unit tests. That local run is the evidence.
+- **A forced upstream timeout is covered by unit tests.** I have not triggered one
+  against a local Worker.
+
+## Known risk
+
+An uncached `/api/snapshot` costs 8 to 19 ms of CPU, above the documented 10 ms free
+tier figure. Cloudflare did not enforce that limit in testing, but it could. The
+mitigation is in the design: the heavy arrivals parsing runs in the Durable Object off
+the request path, a 45 second cache means most requests cost 1 to 2 ms, and concurrent
+requests share one build. If the limit were ever enforced, the first step would be to
+move the status fetch into the cron refresh too, so the request path only reads stored
+data.
+
+## What I would do next
+
+- Watch it through a weekday peak, an overnight period and a real disruption, then
+  recalibrate the thresholds and confirm the flowing while suspended rule.
+- Add a dark theme.
+- Add the Elizabeth line and the DLR if a trustworthy rule for their irregular spacing
+  and missing vehicle ids can be found.
+- Trigger a forced upstream timeout and an outage against a local Worker as scripted
+  checks, not only unit tests.
+- Record a short history of verdicts, so a mismatch can be shown with how long it lasted.
 
 ## Time spent
 
-About 2 hours in total. The split between planning, building and reviewing, and
-verifying was not recorded.
+8 hours in total. The split below is approximate.
+
+- Planning and API discovery: about 1 hour
+- Foundation, tooling and CI: about 1 hour
+- Engine and Worker: about 2 hours
+- Web app and brand: about 1.5 hours
+- Redesign and outage fix: about 1 hour
+- Verification, docs and packaging: about 1.5 hours
+
+The brief suggested about 2 hours and this ran over, mostly because of API discovery,
+the CPU limit finding and the redesign.
 
 ## Phone check
 

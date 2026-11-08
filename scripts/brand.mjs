@@ -82,6 +82,11 @@ const files = {
     real: COLOR.white,
     word: COLOR.white,
   }),
+  'logo-white.svg': logo({
+    official: COLOR.white,
+    real: COLOR.white,
+    word: COLOR.white,
+  }),
   'mark.svg': svg(48, 48, mark({ official: COLOR.grey, real: COLOR.core }), 'Drift'),
 };
 
