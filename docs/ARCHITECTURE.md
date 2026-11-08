@@ -106,6 +106,15 @@ packages/shared  Zod schemas and types used by worker and web.
   paint (strict mode and `m` components throughout). The count up animation engine is a
   second lazy chunk, loaded only when a number actually changes. Initial JavaScript is
   about 115 KB gzipped, of which React is 67 KB.
+- **The drift track is a measurement.** It fills to the observed train count (or gap in
+  minutes) and marks the engine's threshold from `config.ts`, with the rule in words
+  beneath. It is omitted when there is no honest comparison: no live data, closed
+  hours, or the one sided direction case.
+- **Sample mode.** `?sample=1` builds a snapshot with the real engine from hand built
+  inputs, under a persistent banner and with no network request. The query string is
+  parsed with Zod and only the exact value `1` turns it on.
+- **Nothing visible sits under the hero while loading.** The band is sized like a real
+  headline, which cut layout shift from 0.217 to about 0.06.
 - **The data request starts during HTML parsing.** `index.html` preloads
   `/api/snapshot`, so the request runs in parallel with the scripts instead of after
   them. The app's own request carries no custom headers, so the browser reuses the

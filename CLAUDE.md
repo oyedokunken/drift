@@ -91,6 +91,13 @@ scripts/          Brand asset generation (SVG to PNG and ICO).
 - Tokens live in one CSS file as custom properties. Blues: `#0B2A6F`,
   `#2563EB`, `#BFD7FF`. Neutrals: white, `#0A0B0F`, `#F5F6F8`, `#E3E6EB`,
   `#6B7280`, `#374151`. Keep WCAG AA and verify it.
+- Surfaces use the same palette: deep blue masthead, cards and footer, a page wash
+  that is a tint of `#BFD7FF` on white (`--wash`, `--panel-soft`). Every text pair,
+  including translucent layers at their lightest, is checked in `tokens.test.ts`.
+- The drift track shows an observed value against an engine threshold from
+  `config.ts`. Never draw a track that is not a measurement.
+- `?sample=1` shows engine built fixture mismatches with a persistent banner. It must
+  never turn on without that exact query parameter.
 - Do not use TfL line colours, roundel, logo or the phrase "Mind the Gap".
 - Meaning is carried by shape, weight and text as well as colour.
 - Design at 375px first. Touch targets at least 44px. No horizontal scroll at

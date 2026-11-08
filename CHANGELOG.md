@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Interface redesign: a full-bleed deep blue masthead with a faint diverging-lines
+  mark, a light blue page wash, filled line chips and verdict pills, large train
+  counts, deep blue mismatch cards and a deep blue footer.
+- The drift track now draws one measured value against the engine's own threshold from
+  `config.ts`, with the threshold marked, and is omitted where no honest comparison
+  exists.
+- Footer links open in a new tab.
+
+### Added
+
+- Sample mode at `?sample=1`, with a persistent "Sample data, not live" banner.
+
 ## [0.1.0] - 2026-11-08
 
 First release.
