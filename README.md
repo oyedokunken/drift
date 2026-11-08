@@ -59,6 +59,18 @@ short cache keeps TfL traffic independent of visitor count, and if TfL is down t
 Worker serves the last good snapshot marked stale, or a typed 503 if there is none.
 It never returns a bare 500.
 
+Cold start: if the store holds no line summaries, as on empty storage, the first
+request runs one refresh itself instead of waiting for the next cron tick. Concurrent
+requests share that refresh, it is capped at 7 seconds, and if it fails the page still
+gets a valid snapshot with those lines marked "not enough data". If TfL's status feed is
+down and nothing has ever been stored, the Worker still answers with the typed 503.
+
+One live incident is not explained. Shortly after a deploy, the site showed "Live data is
+unavailable" with no earlier snapshot. By the time it was investigated, the API was
+healthy and the logs showed no errors, so the cause was **not proven**. The cold start
+gap above is the likeliest explanation and is now closed, but that is an inference, not a
+finding.
+
 ## The rules
 
 All thresholds are named constants in `packages/engine/src/config.ts`, each with its
@@ -203,7 +215,17 @@ Said plainly, so nothing here is a surprise.
 - **An uncached `/api/snapshot` costs 8 to 19 ms of CPU**, above the documented 10 ms
   free tier figure, which Cloudflare did not enforce. The 45 second cache means most
   requests cost 1 to 2 ms.
-- **Not yet checked on a physical phone** by the owner.
+
+## Time spent
+
+About 2 hours in total. The split between planning, building and reviewing, and
+verifying was not recorded.
+
+## Phone check
+
+Checked on a Samsung S23 5G in Chrome, on MTN mobile data. Sample mode at `/?sample=1`
+showed 3 of 11 lines drifting with all three mismatch cards, the full line list and the
+three footer links.
 
 ## Licence and attribution
 

@@ -6,20 +6,6 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-### Changed
-
-- Interface redesign: a full-bleed deep blue masthead with a faint diverging-lines
-  mark, a light blue page wash, filled line chips and verdict pills, large train
-  counts, deep blue mismatch cards and a deep blue footer.
-- The drift track now draws one measured value against the engine's own threshold from
-  `config.ts`, with the threshold marked, and is omitted where no honest comparison
-  exists.
-- Footer links open in a new tab, carry icons, and a developer credit links to oyedokun.dev.
-
-### Added
-
-- Sample mode at `?sample=1`, with a persistent "Sample data, not live" banner.
-
 ## [0.1.0] - 2026-11-08
 
 First release.
@@ -47,6 +33,29 @@ First release.
   build and a gitleaks secret scan.
 - Documentation: architecture, mismatch rules, API notes, verification record,
   prompt log, security policy and contributing guide.
+
+### Changed
+
+- Interface redesign: a full-bleed deep blue masthead, a light blue page wash, filled
+  line chips and verdict pills, large train counts, deep blue mismatch cards and a deep
+  blue footer.
+- The drift track draws one measured value against the engine's own threshold from
+  `config.ts`, with the threshold marked, and is omitted where no honest comparison
+  exists.
+
+### Fixed
+
+- Cold start: when the store holds no line summaries, the first request runs one
+  refresh, shared between concurrent requests and capped at 7 seconds, instead of
+  showing every line as "no live data" until the next cron tick. A live outage seen
+  shortly after a deploy was not diagnosed to a proven cause, and this is the likeliest
+  explanation, not a confirmed one.
+- Footer links open in a new tab with `noopener`.
+
+### Added (since the first draft)
+
+- Sample mode at `?sample=1`, with a persistent "Sample data, not live" banner.
+- Footer icons and a developer credit linking to oyedokun.dev.
 
 ### Known limits
 

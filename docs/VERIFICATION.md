@@ -82,6 +82,6 @@ Run on a local Worker against the real TfL API with real persisted storage:
   meant overwriting the production secret with an invalid one, and the owner chose not
   to do that. The same behaviour was exercised locally as above.
 - **A forced upstream timeout** was only covered by unit tests.
-- **A physical phone** has not been used to check the live site by the owner. Layout
-  was checked in a mobile emulation at 320, 375, 768 and 1280 pixels, with no
-  horizontal scrolling at any of them.
+- **A physical phone** check was done by the owner on a Samsung S23 5G in Chrome over
+  MTN mobile data, using sample mode. Layout was also checked in a mobile emulation at
+  320, 375, 768 and 1280 pixels, with no horizontal scrolling at any of them.
