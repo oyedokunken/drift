@@ -46,10 +46,8 @@ export async function fetchSnapshot(
 ): Promise<FetchedSnapshot> {
   let response: Response;
   try {
-    response = await fetchImpl('/api/snapshot', {
-      signal,
-      headers: { Accept: 'application/json' },
-    });
+    // No custom headers, so the browser can reuse the request preloaded in index.html.
+    response = await fetchImpl('/api/snapshot', { signal });
   } catch (error) {
     if (signal.aborted) throw error;
     throw new SnapshotError('network', 'The network request failed.');

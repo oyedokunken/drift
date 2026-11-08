@@ -15,12 +15,17 @@
   width: auto;
 }
 
+main {
+  /* Keeps the footer below the fold while content loads, so it cannot visibly jump. */
+  min-height: 85dvh;
+}
+
 .hero {
   padding-block: var(--space-6) var(--space-6);
 }
 
 .hero__title {
-  max-width: 18ch;
+  max-width: 22ch;
   font-size: var(--step-3);
   font-weight: 700;
   line-height: 1.05;

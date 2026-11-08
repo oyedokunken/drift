@@ -17,14 +17,13 @@ async function failureOf(promise: Promise<unknown>): Promise<SnapshotError> {
 }
 
 describe('fetchSnapshot', () => {
-  it('returns a validated snapshot and asks for JSON', async () => {
+  it('returns a validated snapshot from the snapshot route', async () => {
     const fetchMock = respond(snapshotResponse(snapshot()));
     const result = await fetchSnapshot(signal(), fetchMock);
     expect(result.snapshot.verdicts).toHaveLength(11);
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/snapshot',
-      expect.objectContaining({ headers: { Accept: 'application/json' } }),
-    );
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(url).toBe('/api/snapshot');
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
   });
 
   it('measures the server clock offset from X-Server-Time', async () => {
