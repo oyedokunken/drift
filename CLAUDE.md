@@ -24,6 +24,7 @@ pnpm format:check                # prettier check
 pnpm typecheck                   # tsc --noEmit in every package
 pnpm build                       # build web, then worker
 pnpm deploy                      # wrangler deploy (manual, needs login)
+pnpm brand                       # regenerate logo, favicons and the social image
 ```
 
 Run typecheck, lint and tests before every commit. Never claim something works

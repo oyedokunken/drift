@@ -98,6 +98,21 @@ packages/shared  Zod schemas and types used by worker and web.
                                       Cache API (45 s) --> browser (Zod) --> UI
 ```
 
+## Web app decisions
+
+- **Animation features load lazily.** The brief asks for LazyMotion with and also for a layout animation when lines reorder. The layout feature only exists in
+  the larger set, so the features are fetched as a separate chunk after first
+  paint ( mode and components throughout). The count up animation engine is
+  a second lazy chunk, loaded only when a number actually changes. Initial JavaScript is
+  about 115 KB gzipped, of which React is 67 KB.
+- **The data request starts during HTML parsing.** preloads
+  , so the request runs in parallel with the scripts instead of after
+  them. The app's own request carries no custom headers, so the browser reuses the
+  preloaded response (checked: one request on first load, not two).
+- **Server time, not device time.** Every snapshot response carries .
+  The browser measures its offset from the server and shows ages on that clock, because
+  a cached snapshot can be 45 seconds old and a device clock can be wrong.
+
 ## Resilience model
 
 - **Timeouts and retries**: every upstream call has a 5 second AbortController
