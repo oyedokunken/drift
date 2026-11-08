@@ -231,10 +231,17 @@
   line-height: 1.2;
 }
 
+.row__facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  grid-column: 1 / -1;
+}
+
 .row__side {
   display: grid;
   gap: 0.15rem;
-  grid-column: 1 / -1;
+  align-content: start;
   font-size: var(--step--1);
   line-height: 1.35;
 }
@@ -262,16 +269,17 @@
 
 @media (min-width: 48rem) {
   .row {
-    grid-template-columns: minmax(11rem, 1.2fr) 1.1fr 1.3fr minmax(8rem, 1fr) 9.5rem;
+    grid-template-columns: minmax(11rem, 1.2fr) 1.1fr 1.4fr minmax(8rem, 1fr) 9.5rem;
     gap: var(--space-4);
   }
 
-  .row__side {
-    grid-column: auto;
+  .row__facts {
+    display: contents;
   }
 
   .row__track {
     grid-column: auto;
+    order: 4;
   }
 
   .row .track__ends {
@@ -280,6 +288,7 @@
 
   .row__verdict {
     justify-self: end;
+    order: 5;
   }
 }
 

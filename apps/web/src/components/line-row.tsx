@@ -17,13 +17,15 @@ export function LineRow({ verdict }: { readonly verdict: Verdict }) {
       <div className="row__verdict">
         <VerdictLabel outcome={verdict.outcome} />
       </div>
-      <div className="row__side">
-        <span className="row__label">Official</span>
-        <span>{verdict.official.label}</span>
-      </div>
-      <div className="row__side">
-        <span className="row__label">Live data</span>
-        <span>{observedText(verdict)}</span>
+      <div className="row__facts">
+        <div className="row__side">
+          <span className="row__label">Official</span>
+          <span>{verdict.official.label}</span>
+        </div>
+        <div className="row__side">
+          <span className="row__label">Live data</span>
+          <span>{observedText(verdict)}</span>
+        </div>
       </div>
       <div className="row__track">
         <DriftTrack verdict={verdict} />

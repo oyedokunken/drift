@@ -35,10 +35,12 @@ export function DriftTrack({
             style={{ left: percent(left), width: percent(width) }}
           />
         )}
-        <span
-          className="track__marker track__marker--official"
-          style={{ left: percent(official) }}
-        />
+        {observed !== null && (
+          <span
+            className="track__marker track__marker--official"
+            style={{ left: percent(official) }}
+          />
+        )}
         {observed !== null && (
           <span
             className="track__marker track__marker--observed"
