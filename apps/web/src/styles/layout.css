@@ -23,21 +23,6 @@
   color: var(--white);
 }
 
-.masthead > .container {
-  position: relative;
-}
-
-.masthead__mark {
-  position: absolute;
-  top: 50%;
-  right: -3rem;
-  width: min(125vw, 38rem);
-  height: auto;
-  opacity: 0.14;
-  transform: translateY(-50%);
-  pointer-events: none;
-}
-
 .site-header {
   padding-block: var(--space-4);
 }
@@ -194,20 +179,6 @@ main {
   font-size: var(--step--1);
 }
 
-.footer__inner {
-  position: relative;
-}
-
-.footer__mark {
-  position: absolute;
-  right: -4rem;
-  bottom: -3rem;
-  width: min(100vw, 28rem);
-  height: auto;
-  opacity: 0.12;
-  pointer-events: none;
-}
-
 .footer p {
   max-width: 40rem;
   font-size: var(--step-0);
@@ -235,8 +206,13 @@ main {
 .footer__links a {
   display: inline-flex;
   align-items: center;
+  gap: var(--space-2);
   min-height: 2.75rem;
   font-weight: 700;
+}
+
+.footer__links svg {
+  flex: none;
 }
 
 @media (min-width: 48rem) {

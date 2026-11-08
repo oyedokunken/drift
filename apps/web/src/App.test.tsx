@@ -248,7 +248,7 @@ describe('hard error', () => {
 });
 
 describe('footer', () => {
-  it('carries the attribution and the two links', () => {
+  it('carries the attribution and the three links', () => {
     stubFetch(() => new Promise<Response>(() => undefined));
     renderApp();
     expect(
@@ -266,15 +266,18 @@ describe('footer', () => {
       'href',
       'https://github.com/oyedokunken/drift',
     );
+    expect(
+      screen.getByRole('link', { name: 'Developed by @oyedokunken' }),
+    ).toHaveAttribute('href', 'https://www.oyedokun.dev/');
   });
 
-  it('opens both links in a new tab without leaking the opener', () => {
+  it('opens every link in a new tab without leaking the opener', () => {
     stubFetch(() => new Promise<Response>(() => undefined));
     renderApp();
     const links = within(
       screen.getByRole('navigation', { name: 'Project links' }),
     ).getAllByRole('link');
-    expect(links).toHaveLength(2);
+    expect(links).toHaveLength(3);
     for (const link of links) {
       expect(link).toHaveAttribute('target', '_blank');
       expect(link).toHaveAttribute('rel', 'noopener noreferrer');

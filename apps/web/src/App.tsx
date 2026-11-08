@@ -4,7 +4,6 @@ import type { Snapshot } from '@drift/shared';
 import { Age } from './components/freshness.tsx';
 import { Footer } from './components/footer.tsx';
 import { Hero } from './components/hero.tsx';
-import { BackdropMark } from './components/mark.tsx';
 import { LineRow } from './components/line-row.tsx';
 import { MismatchCard } from './components/mismatch-card.tsx';
 import {
@@ -161,7 +160,6 @@ function Page({
       <div className="shell">
         {banner}
         <div className="masthead">
-          <BackdropMark className="masthead__mark" />
           <div className="container">
             <header className="site-header">
               <img

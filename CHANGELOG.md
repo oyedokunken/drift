@@ -14,7 +14,7 @@ All notable changes to this project are documented here. The format follows
 - The drift track now draws one measured value against the engine's own threshold from
   `config.ts`, with the threshold marked, and is omitted where no honest comparison
   exists.
-- Footer links open in a new tab.
+- Footer links open in a new tab, carry icons, and a developer credit links to oyedokun.dev.
 
 ### Added
 
