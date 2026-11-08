@@ -96,6 +96,13 @@ See `docs/ARCHITECTURE.md` for the chosen response.
 - Status changes on the order of minutes. Predictions refresh about every 30
   seconds.
 
+## Errors
+
+- An **invalid app key returns HTTP 429**, not 401 or 403. A bad key therefore
+  looks exactly like rate limiting and is retried like it. The retry budget is
+  small and capped (3 attempts per call), so a misconfigured key costs a bounded
+  number of requests rather than a storm.
+
 ## Fixtures
 
 Sanitised captures live in `packages/engine/fixtures/`. They contain no key
