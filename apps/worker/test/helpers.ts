@@ -4,7 +4,7 @@ import type { Store } from '../src/store.ts';
 import type { UpstreamOptions } from '../src/upstream.ts';
 
 /** A stand in for the TfL key. Tests assert it never appears in any output. */
-export const KEY = 'SENTINEL-KEY-0123456789abcdef';
+export const KEY = 'fake-key-for-tests';
 
 export function json(body: unknown, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers);
