@@ -257,9 +257,6 @@ data.
 - Redesign and outage fix: about 1 hour
 - Verification, docs and packaging: about 1.5 hours
 
-The brief suggested about 2 hours and this ran over, mostly because of API discovery,
-the CPU limit finding and the redesign.
-
 ## Phone check
 
 Checked on a Samsung S23 5G in Chrome, on MTN mobile data. Sample mode at `/?sample=1`
