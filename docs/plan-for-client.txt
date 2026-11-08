@@ -1,0 +1,15 @@
+Hello, here is my short plan for Drift, before I build.
+
+What it does: a live page showing where TfL's official line status and the real network disagree, for the Tube lines.
+
+Mismatch rules, using predicted trains from TfL's arrivals data:
+1. Quiet while good: status is Good Service but fewer than 3 trains are due in 15 minutes, or one direction has none.
+2. Flowing while suspended: line is Suspended yet 6 or more trains are due.
+3. Wide gaps: Good Service or Minor Delays, but typical train spacing is 15 minutes or more.
+Partial closures, planned works and missing data always resolve to "unknown", never a false alarm.
+
+Architecture: React and TypeScript on one Cloudflare Worker. The free tier allows 10 ms of CPU per run, and TfL's arrivals feed takes 20 to 37 ms just to parse, so cron triggers split it by line into small summaries held in a Durable Object.
+
+Testing: Vitest on real captured data plus edge cases, CI and a secret scan on every push.
+
+Cut on purpose: DLR, Elizabeth line unless it fits the CPU budget, dark theme.
