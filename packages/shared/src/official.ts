@@ -12,7 +12,7 @@ export type OfficialStatus = z.infer<typeof officialStatusSchema>;
 /** A line can carry several official statuses at once. */
 export const lineStatusSchema = z.object({
   lineId: lineIdSchema,
-  statuses: z.array(officialStatusSchema).min(1),
+  statuses: z.tuple([officialStatusSchema], officialStatusSchema),
 });
 
 export type LineStatus = z.infer<typeof lineStatusSchema>;
