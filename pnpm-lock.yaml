@@ -211,6 +211,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@drift/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
       '@drift/shared':
         specifier: workspace:*
         version: link:../../packages/shared

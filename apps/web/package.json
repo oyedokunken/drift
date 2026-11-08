@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@drift/engine": "workspace:*",
     "@drift/shared": "workspace:*",
     "@fontsource-variable/urbanist": "^5.3.0",
     "framer-motion": "^14.10.1",

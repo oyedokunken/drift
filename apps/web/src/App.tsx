@@ -1,4 +1,5 @@
 import { m } from 'framer-motion';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { Snapshot } from '@drift/shared';
 import { Age } from './components/freshness.tsx';
 import { Footer } from './components/footer.tsx';
@@ -13,6 +14,7 @@ import {
   HeroSkeleton,
   LoadingSkeleton,
 } from './components/states.tsx';
+import { isSampleRequested } from './lib/sample-mode.ts';
 import { useOnline } from './lib/use-clock.ts';
 import { useSnapshot } from './lib/use-snapshot.ts';
 import { countOutcomes, sortVerdicts } from './lib/view.ts';
@@ -144,13 +146,20 @@ function Dashboard({
   );
 }
 
-export function App() {
-  const { status, data, failures, refreshing, refresh } = useSnapshot();
-  const online = useOnline();
-
+/** The page frame shared by the live and the sample views. */
+function Page({
+  hero,
+  banner,
+  children,
+}: {
+  readonly hero: ReactNode;
+  readonly banner?: ReactNode;
+  readonly children: ReactNode;
+}) {
   return (
     <MotionRoot>
       <div className="shell">
+        {banner}
         <div className="masthead">
           <BackdropMark className="masthead__mark" />
           <div className="container">
@@ -163,39 +172,100 @@ export function App() {
                 height="32"
               />
             </header>
-            {status === 'loading' && <HeroSkeleton />}
-            {data !== null && (
-              <Hero
-                snapshot={data.snapshot}
-                serverOffsetMs={data.serverOffsetMs}
-                online={online}
-              />
-            )}
+            {hero}
           </div>
         </div>
-
-        <main className="container">
-          {status === 'loading' && <LoadingSkeleton />}
-          {status === 'failed' && (
-            <ErrorPanel offline={!online} retrying={refreshing} onRetry={refresh} />
-          )}
-          {data !== null && (
-            <>
-              <p className="visually-hidden" role="status" aria-live="polite">
-                {announcement(data.snapshot)}
-              </p>
-              <Dashboard
-                snapshot={data.snapshot}
-                serverOffsetMs={data.serverOffsetMs}
-                online={online}
-                failures={failures}
-              />
-            </>
-          )}
-        </main>
-
+        <main className="container">{children}</main>
         <Footer />
       </div>
     </MotionRoot>
   );
+}
+
+function LiveApp() {
+  const { status, data, failures, refreshing, refresh } = useSnapshot();
+  const online = useOnline();
+
+  return (
+    <Page
+      hero={
+        <>
+          {status === 'loading' && <HeroSkeleton />}
+          {data !== null && (
+            <Hero
+              snapshot={data.snapshot}
+              serverOffsetMs={data.serverOffsetMs}
+              online={online}
+            />
+          )}
+        </>
+      }
+    >
+      {status === 'loading' && <LoadingSkeleton />}
+      {status === 'failed' && (
+        <ErrorPanel offline={!online} retrying={refreshing} onRetry={refresh} />
+      )}
+      {data !== null && (
+        <>
+          <p className="visually-hidden" role="status" aria-live="polite">
+            {announcement(data.snapshot)}
+          </p>
+          <Dashboard
+            snapshot={data.snapshot}
+            serverOffsetMs={data.serverOffsetMs}
+            online={online}
+            failures={failures}
+          />
+        </>
+      )}
+    </Page>
+  );
+}
+
+/** Always visible in sample mode, so nobody mistakes the fixture for the live network. */
+function SampleBanner() {
+  return (
+    <div className="sample-bar" role="note">
+      <strong>Sample data, not live</strong>
+      <a href="/">View live data</a>
+    </div>
+  );
+}
+
+/** `?sample=1`: fixture based mismatches, built by the real engine, with no network. */
+function SampleApp() {
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void import('./sample.ts').then(({ buildSampleSnapshot }) => {
+      if (!cancelled) setSnapshot(buildSampleSnapshot(new Date()));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <Page
+      banner={<SampleBanner />}
+      hero={
+        snapshot === null ? (
+          <HeroSkeleton />
+        ) : (
+          <Hero snapshot={snapshot} serverOffsetMs={0} online showFreshness={false} />
+        )
+      }
+    >
+      {snapshot === null ? (
+        <LoadingSkeleton />
+      ) : (
+        <Dashboard snapshot={snapshot} serverOffsetMs={0} online failures={0} />
+      )}
+    </Page>
+  );
+}
+
+export function App({ search = window.location.search }: { readonly search?: string }) {
+  return isSampleRequested(search) ? <SampleApp /> : <LiveApp />;
 }

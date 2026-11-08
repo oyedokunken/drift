@@ -278,3 +278,49 @@ describe('footer', () => {
     }
   });
 });
+
+describe('sample mode', () => {
+  const SAMPLE_BANNER = 'Sample data, not live';
+
+  it('shows the banner, three mismatches and makes no request', async () => {
+    const fetchMock = stubFetch(() => new Promise<Response>(() => undefined));
+    const { container } = render(<App search="?sample=1" />);
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
+      '3 of 11 lines are drifting',
+    );
+    expect(screen.getByRole('note')).toHaveTextContent(SAMPLE_BANNER);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('does not claim the sample data is fresh', async () => {
+    stubFetch(() => new Promise<Response>(() => undefined));
+    render(<App search="?sample=1" />);
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.queryByText(/Updated/)).not.toBeInTheDocument();
+  });
+
+  it('offers a way back to the live data', async () => {
+    stubFetch(() => new Promise<Response>(() => undefined));
+    render(<App search="?sample=1" />);
+    expect(await screen.findByRole('link', { name: 'View live data' })).toHaveAttribute(
+      'href',
+      '/',
+    );
+  });
+
+  it.each(['', '?sample=0', '?sample', '?sample=true', '?other=1'])(
+    'never appears for %j',
+    async (search) => {
+      const fetchMock = stubFetch(() =>
+        Promise.resolve(snapshotResponse(snapshot({}, []))),
+      );
+      render(<App search={search} />);
+      expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
+        'Every line we can check is in step',
+      );
+      expect(screen.queryByText(SAMPLE_BANNER)).not.toBeInTheDocument();
+      expect(fetchMock).toHaveBeenCalled();
+    },
+  );
+});
