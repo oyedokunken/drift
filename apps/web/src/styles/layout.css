@@ -1,8 +1,41 @@
-.page {
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.container {
   width: 100%;
   max-width: calc(var(--page-max) + 2 * var(--gutter));
   margin-inline: auto;
   padding-inline: var(--gutter);
+}
+
+/* ---- Masthead: the deep blue band that opens the page ---------------------------- */
+
+.masthead {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0 0 var(--radius-l) var(--radius-l);
+  background:
+    radial-gradient(90% 130% at 100% 0%, rgb(37 99 235 / 0.55), transparent 70%),
+    var(--blue-900);
+  color: var(--white);
+}
+
+.masthead > .container {
+  position: relative;
+}
+
+.masthead__mark {
+  position: absolute;
+  top: 50%;
+  right: -3rem;
+  width: min(125vw, 38rem);
+  height: auto;
+  opacity: 0.14;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 
 .site-header {
@@ -17,53 +50,58 @@
 
 main {
   /* Keeps the footer below the fold while content loads, so it cannot visibly jump. */
-  min-height: 85dvh;
+  min-height: 70dvh;
 }
 
 .hero {
-  padding-block: var(--space-6) var(--space-6);
+  padding-block: var(--space-5) var(--space-7);
 }
 
 .hero__title {
-  max-width: 22ch;
-  font-size: var(--step-3);
-  font-weight: 700;
-  line-height: 1.05;
-  letter-spacing: -0.025em;
+  max-width: 17ch;
+  font-size: var(--step-4);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -0.03em;
   text-wrap: balance;
 }
 
 .hero__count {
-  color: var(--accent);
+  color: var(--blue-200);
 }
 
 .hero__meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2) var(--space-4);
-  margin-top: var(--space-4);
-  color: var(--text-muted);
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-5);
   font-size: var(--step--1);
 }
 
-.fresh {
+.pill {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  padding: 0.4rem 0.9rem;
+  border: 1px solid rgb(255 255 255 / 0.28);
+  border-radius: var(--radius-pill);
+  background: rgb(255 255 255 / 0.12);
+  color: var(--white);
   font-weight: 600;
+  line-height: 1.3;
 }
 
 .fresh__dot {
-  width: 0.5rem;
-  height: 0.5rem;
+  width: 0.55rem;
+  height: 0.55rem;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--blue-200);
 }
 
 .fresh[data-state='stale'] .fresh__dot {
   background: transparent;
-  box-shadow: inset 0 0 0 2px var(--grey-500);
+  box-shadow: inset 0 0 0 2px var(--white);
 }
 
 .fresh[data-state='live'] .fresh__dot {
@@ -82,6 +120,7 @@ main {
 
 .banner {
   display: flex;
+  margin-top: var(--space-5);
   gap: var(--space-3);
   align-items: flex-start;
   margin-bottom: var(--space-5);
@@ -126,20 +165,53 @@ main {
   align-items: center;
   margin-top: var(--space-5);
   padding: var(--space-5);
-  border: 1px solid var(--hairline);
   border-radius: var(--radius-m);
+  background: var(--panel-soft);
+}
+
+.clear > svg {
+  flex: none;
 }
 
 .clear__text {
   max-width: 34rem;
+  color: var(--blue-900);
+  font-size: var(--step-1);
+  font-weight: 600;
+  line-height: 1.3;
 }
 
+/* ---- Footer: deep blue, mirroring the masthead ----------------------------------- */
+
 .footer {
+  position: relative;
+  overflow: hidden;
   margin-top: var(--space-6);
-  padding-block: var(--space-5) var(--space-7);
-  border-top: 1px solid var(--hairline);
-  color: var(--text-muted);
+  padding-block: var(--space-7) var(--space-8);
+  border-radius: var(--radius-l) var(--radius-l) 0 0;
+  background: var(--blue-900);
+  color: var(--white);
   font-size: var(--step--1);
+}
+
+.footer__inner {
+  position: relative;
+}
+
+.footer__mark {
+  position: absolute;
+  top: 50%;
+  left: -4rem;
+  width: min(110vw, 30rem);
+  height: auto;
+  opacity: 0.12;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.footer p {
+  max-width: 40rem;
+  font-size: var(--step-0);
 }
 
 .footer p + p {
@@ -150,19 +222,27 @@ main {
   display: flex;
   flex-wrap: wrap;
   gap: 0 var(--space-5);
-  margin-top: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.footer a {
+  color: var(--blue-200);
+}
+
+.footer a:hover {
+  color: var(--white);
 }
 
 .footer__links a {
   display: inline-flex;
   align-items: center;
   min-height: 2.75rem;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 @media (min-width: 48rem) {
   .hero {
-    padding-block: var(--space-7) var(--space-6);
+    padding-block: var(--space-6) var(--space-8);
   }
 
   .stack--cards {

@@ -130,6 +130,10 @@ for (const [name, content] of Object.entries(files)) {
 
 mkdirSync(publicDir, { recursive: true });
 copyFileSync(path.join(brandDir, 'logo.svg'), path.join(publicDir, 'logo.svg'));
+copyFileSync(
+  path.join(brandDir, 'logo-on-dark.svg'),
+  path.join(publicDir, 'logo-on-dark.svg'),
+);
 copyFileSync(path.join(brandDir, 'favicon.svg'), path.join(publicDir, 'favicon.svg'));
 
 function png(svgText, width) {

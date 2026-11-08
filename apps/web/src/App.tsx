@@ -3,9 +3,16 @@ import type { Snapshot } from '@drift/shared';
 import { Age } from './components/freshness.tsx';
 import { Footer } from './components/footer.tsx';
 import { Hero } from './components/hero.tsx';
+import { BackdropMark } from './components/mark.tsx';
 import { LineRow } from './components/line-row.tsx';
 import { MismatchCard } from './components/mismatch-card.tsx';
-import { AllClear, Banner, ErrorPanel, LoadingSkeleton } from './components/states.tsx';
+import {
+  AllClear,
+  Banner,
+  ErrorPanel,
+  HeroSkeleton,
+  LoadingSkeleton,
+} from './components/states.tsx';
 import { useOnline } from './lib/use-clock.ts';
 import { useSnapshot } from './lib/use-snapshot.ts';
 import { countOutcomes, sortVerdicts } from './lib/view.ts';
@@ -83,7 +90,6 @@ function Dashboard({
 
   return (
     <>
-      <Hero snapshot={snapshot} serverOffsetMs={serverOffsetMs} online={online} />
       <Notices
         snapshot={snapshot}
         serverOffsetMs={serverOffsetMs}
@@ -144,18 +150,31 @@ export function App() {
 
   return (
     <MotionRoot>
-      <div className="page">
-        <header className="site-header">
-          <img
-            className="site-header__logo"
-            src="/logo.svg"
-            alt="Drift"
-            width="140"
-            height="32"
-          />
-        </header>
+      <div className="shell">
+        <div className="masthead">
+          <BackdropMark className="masthead__mark" />
+          <div className="container">
+            <header className="site-header">
+              <img
+                className="site-header__logo"
+                src="/logo-on-dark.svg"
+                alt="Drift"
+                width="140"
+                height="32"
+              />
+            </header>
+            {status === 'loading' && <HeroSkeleton />}
+            {data !== null && (
+              <Hero
+                snapshot={data.snapshot}
+                serverOffsetMs={data.serverOffsetMs}
+                online={online}
+              />
+            )}
+          </div>
+        </div>
 
-        <main>
+        <main className="container">
           {status === 'loading' && <LoadingSkeleton />}
           {status === 'failed' && (
             <ErrorPanel offline={!online} retrying={refreshing} onRetry={refresh} />

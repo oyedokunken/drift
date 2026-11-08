@@ -2,7 +2,9 @@ import type { Verdict } from '@drift/shared';
 import { OUTCOME_LABEL } from '../lib/view.ts';
 import { CheckIcon, DashedIcon, DriftIcon } from './icons.tsx';
 
-const ICON: Readonly<Record<Verdict['outcome'], () => React.JSX.Element>> = {
+const ICON: Readonly<
+  Record<Verdict['outcome'], (props: { readonly size?: number }) => React.JSX.Element>
+> = {
   mismatch: DriftIcon,
   match: CheckIcon,
   unknown: DashedIcon,

@@ -33,14 +33,14 @@ export function Freshness({
 
   return (
     <>
-      <span className="fresh" data-state={live ? 'live' : 'stale'}>
+      <span className="fresh pill" data-state={live ? 'live' : 'stale'}>
         <span className="fresh__dot" aria-hidden="true" />
         <span>
           Updated <time dateTime={snapshot.generatedAt}>{formatAge(age)}</time>
         </span>
       </span>
       {snapshot.arrivalsAsOf !== null && (
-        <span>
+        <span className="pill">
           Train data from{' '}
           <time dateTime={snapshot.arrivalsAsOf}>
             {formatAge(ageSeconds(snapshot.arrivalsAsOf, now, serverOffsetMs))}

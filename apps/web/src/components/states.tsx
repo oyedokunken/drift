@@ -19,14 +19,20 @@ export function Banner({
   );
 }
 
-/** Shown on the very first load, shaped like the page that is coming. */
+/** The hero band while the first answer is on its way. */
+export function HeroSkeleton() {
+  return (
+    <div className="hero" aria-hidden="true">
+      <div className="skeleton skeleton--title" />
+      <div className="skeleton skeleton--line" />
+    </div>
+  );
+}
+
+/** Shown on the very first load, shaped like the list that is coming. */
 export function LoadingSkeleton() {
   return (
     <div aria-busy="true" aria-label="Loading live data" role="status">
-      <section className="hero">
-        <div className="skeleton skeleton--title" />
-        <div className="skeleton skeleton--line" />
-      </section>
       <div className="stack">
         {[1, 2, 3, 4, 5].map((n) => (
           <div key={n} className="skeleton skeleton--row" />
@@ -67,7 +73,7 @@ export function ErrorPanel({
 export function AllClear({ checked }: { readonly checked: number }) {
   return (
     <div className="clear">
-      <CheckIcon />
+      <CheckIcon size={56} />
       <p className="clear__text">
         Nothing is drifting. All {checked} lines we could check match their official
         status.

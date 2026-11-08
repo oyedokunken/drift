@@ -14,8 +14,13 @@
   --grey-500: #6b7280;
   --grey-700: #374151;
 
+  /* Tints of --blue-200 on white, for the page and for soft panels */
+  --wash: #eff5ff;
+  --panel-soft: #e2edff;
+
   /* Roles */
   --surface: var(--white);
+  --page: var(--wash);
   --surface-sunken: var(--grey-50);
   --text: var(--ink);
   --text-muted: var(--grey-700);
@@ -36,6 +41,7 @@
 
   --radius-s: 0.5rem;
   --radius-m: 1rem;
+  --radius-l: 1.5rem;
   --radius-pill: 62.5rem;
 
   /* Type: Urbanist only, on a fluid scale */
@@ -45,6 +51,8 @@
   --step-1: clamp(1.1875rem, 1.1rem + 0.45vw, 1.375rem);
   --step-2: clamp(1.5rem, 1.3rem + 1vw, 2rem);
   --step-3: clamp(2.125rem, 1.6rem + 2.6vw, 3.5rem);
+  --step-4: clamp(2.375rem, 1.5rem + 4.4vw, 4.75rem);
+  --step-5: clamp(2rem, 1.7rem + 1.5vw, 2.75rem);
 
   /* Layout and motion */
   --page-max: 62rem;

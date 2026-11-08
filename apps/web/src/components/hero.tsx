@@ -1,5 +1,7 @@
+import { m } from 'framer-motion';
 import type { Snapshot } from '@drift/shared';
 import { countOutcomes } from '../lib/view.ts';
+import { itemVariants, listVariants } from '../motion/motion.tsx';
 import { AnimatedNumber } from './animated-number.tsx';
 import { Freshness } from './freshness.tsx';
 
@@ -8,16 +10,24 @@ export function Hero({
   snapshot,
   serverOffsetMs,
   online,
+  showFreshness = true,
 }: {
   readonly snapshot: Snapshot;
   readonly serverOffsetMs: number;
   readonly online: boolean;
+  readonly showFreshness?: boolean;
 }) {
   const counts = countOutcomes(snapshot.verdicts);
 
   return (
-    <section className="hero" aria-labelledby="headline">
-      <h1 id="headline" className="hero__title">
+    <m.section
+      className="hero"
+      aria-labelledby="headline"
+      variants={listVariants}
+      initial="hidden"
+      animate="show"
+    >
+      <m.h1 id="headline" className="hero__title" variants={itemVariants}>
         {counts.mismatch > 0 ? (
           <>
             <AnimatedNumber value={counts.mismatch} /> of {counts.total}{' '}
@@ -27,16 +37,22 @@ export function Hero({
         ) : (
           <>Every line we can check is in step with its official status</>
         )}
-      </h1>
-      <div className="hero__meta">
-        <Freshness snapshot={snapshot} serverOffsetMs={serverOffsetMs} online={online} />
+      </m.h1>
+      <m.div className="hero__meta" variants={itemVariants}>
+        {showFreshness && (
+          <Freshness
+            snapshot={snapshot}
+            serverOffsetMs={serverOffsetMs}
+            online={online}
+          />
+        )}
         {counts.unknown > 0 && (
-          <span>
+          <span className="hero__note">
             {counts.unknown} {counts.unknown === 1 ? 'line' : 'lines'} could not be
             checked
           </span>
         )}
-      </div>
-    </section>
+      </m.div>
+    </m.section>
   );
 }

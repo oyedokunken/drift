@@ -33,7 +33,7 @@ html {
 body {
   margin: 0;
   min-height: 100dvh;
-  background: var(--surface);
+  background: var(--page);
   color: var(--text);
   font-family: var(--font);
   font-size: var(--step-0);
@@ -99,4 +99,9 @@ button {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+.masthead :focus-visible,
+.footer :focus-visible {
+  outline-color: var(--white);
 }
