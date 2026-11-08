@@ -19,7 +19,8 @@
     "typecheck": "tsc --noEmit && pnpm -r typecheck",
     "build": "pnpm -r --if-present build",
     "deploy": "pnpm build && pnpm --filter @drift/worker deploy",
-    "prepare": "simple-git-hooks"
+    "prepare": "simple-git-hooks",
+    "brand": "node scripts/brand.mjs"
   },
   "simple-git-hooks": {
     "pre-commit": "pnpm exec lint-staged"
@@ -33,10 +34,14 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@expo-google-fonts/urbanist": "^0.4.2",
+    "@resvg/resvg-js": "^2.6.2",
+    "@types/node": "^22.20.5",
     "@vitest/coverage-v8": "^5.1.0",
     "eslint": "^10.14.0",
     "globals": "^17.14.0",
     "lint-staged": "^17.6.0",
+    "opentype.js": "^2.0.0",
     "prettier": "^3.9.10",
     "simple-git-hooks": "^2.14.0",
     "typescript": "^6.0.3",
