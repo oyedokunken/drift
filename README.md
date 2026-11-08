@@ -9,14 +9,15 @@ the rule that fired, a plain reason and how confident it is.
 
 **Live:** https://drift.oyedokunken.workers.dev
 
-| On a phone                                            | The mismatch state (fixture data, see below)         |
-| ----------------------------------------------------- | ---------------------------------------------------- |
-| ![Drift on a phone](docs/screenshots/live-mobile.png) | ![Mismatch cards](docs/screenshots/mismatch-375.png) |
+| On a phone (sample mode)                                      | On a desktop (sample mode)                                      |
+| ------------------------------------------------------------- | --------------------------------------------------------------- |
+| ![Mismatch cards at 375px](docs/screenshots/mismatch-375.png) | ![Mismatch cards at 1280px](docs/screenshots/mismatch-1280.png) |
 
-The left image is the real live site. The network was healthy when it was taken, so
-the right image shows the mismatch design using fixture data, because no real
-mismatch has appeared in the hours it has been watched (see
-[How it was verified](#how-it-was-verified)).
+Both images use sample mode: open `/?sample=1` to see the mismatch design built from
+fixture data by the real engine, under a persistent "Sample data, not live" banner. It
+only turns on for that exact query parameter and makes no network request. No real
+mismatch has appeared in the hours Drift has been watched (see
+[How it was verified](#how-it-was-verified)), so this is how the design is reviewed.
 
 ## Why
 
