@@ -144,8 +144,30 @@ packages/shared  Zod schemas and types used by worker and web.
   production measurements ever show the refresh nearing a limit, it can be split
   by group across several Durable Object calls without changing anything else.
 
-## Open measurements (Stage 7)
+## Measured on the deployed Worker
 
-1. Reported CPU time of a real refresh and of a real `/api/snapshot` request,
-   from `wrangler tail`.
-2. Whether the request handler stays under 10 ms.
+CPU time as reported by the platform (`wrangler tail`), on 2026-11-08 against live TfL data:
+
+| Invocation                                      | CPU         | Wall time     |
+| ----------------------------------------------- | ----------- | ------------- |
+| Cron handler (hands off to the Durable Object)  | 1 to 2 ms   | 0.4 to 2.6 s  |
+| Durable Object refresh (5 parallel TfL fetches) | 53 to 82 ms | 0.3 to 2.1 s  |
+| `/api/snapshot`, from the 45 second cache       | 1 to 2 ms   | 7 to 22 ms    |
+| `/api/snapshot`, built from scratch             | 8 to 19 ms  | 180 to 290 ms |
+| Static page                                     | 0 to 2 ms   | 12 to 157 ms  |
+
+Every refresh updated all 11 lines with none failing.
+
+What this means, without overstating it:
+
+- The refresh costs far more than the documented 10 ms, and was not stopped. It runs in
+  a Durable Object, whose documented default is 30 seconds. This is the part of the
+  design that depends on the Durable Object limit, and it has headroom of several times.
+- A request that has to build the snapshot from scratch can exceed 10 ms (it did, up to
+  19 ms), and Cloudflare did not enforce the documented free tier figure on it. The
+  45 second cache makes that the rare case: most requests cost 1 to 2 ms. If enforcement
+  were ever applied, the first request after each cache expiry in each location would be
+  the one at risk, and the fix would be to have the cron refresh also write the finished
+  snapshot so the request path only reads it.
+- The Elizabeth line was not added. Its parse cost would fit, but its train spacing is
+  too irregular for the wide gaps rule (see Scope).
