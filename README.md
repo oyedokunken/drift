@@ -35,14 +35,26 @@ thin, missing or ambiguous, Drift says "not enough data" rather than guessing.
 
 ## How it works
 
-```
- every minute (cron)                     on each visitor request
- Worker.scheduled --> Durable Object     TfL Status (13 KB) ----+
-      5 parallel TfL Arrivals fetches                           v
-      parse, Zod, summarise() ---------> Durable Object --> evaluate() --> snapshot
-                                          (line summaries)    (engine)         |
-                                                                               v
-                                          Cache API (45 s) --> browser (Zod) --> UI
+```mermaid
+flowchart LR
+  subgraph cron["Every minute (cron)"]
+    direction LR
+    sched["Worker.scheduled"] --> arrivals["5 parallel TfL Arrivals fetches"]
+    arrivals --> parse["parse, Zod, summarise()"]
+  end
+
+  subgraph request["On each visitor request"]
+    direction LR
+    status["TfL Status (13 KB)"] --> evaluate["evaluate() in the engine"]
+    evaluate --> snapshot["snapshot"]
+    snapshot --> cache["Cache API (45 s)"]
+    cache --> browser["Browser (Zod)"]
+    browser --> ui["UI"]
+  end
+
+  parse --> store[("Durable Object: line summaries")]
+  store --> evaluate
+  store -. "cold start: empty store runs one refresh" .-> arrivals
 ```
 
 One Cloudflare Worker serves the web app and the API, so there is one deploy, one
