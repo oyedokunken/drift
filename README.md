@@ -154,6 +154,21 @@ Size: the initial JavaScript is about 115 KB gzipped (React is 67 KB of that), w
 further 41 KB of animation code that loads after first paint. Total transfer on first
 load is about 190 KB including the self hosted font.
 
+## Deviations from the plan
+
+The plan sent before building described a cron split by line and KV storage. Three
+things changed once the real numbers were in.
+
+- **KV became a Durable Object.** Workers KV allows 1,000 writes a day on the free
+  plan, and the refresh writes every minute, so KV could not hold the state.
+- **One cron trigger with five parallel fetches replaced the per line cron split.** A
+  deployed measurement showed the Durable Object has far more CPU headroom than a plain
+  handler, so one trigger now drives five parallel TfL fetches inside it. That is
+  simpler, and one failing group still leaves the other lines fresh.
+- **`domMax` replaced `domAnimation`.** The brief asks for both a small bundle and a
+  layout animation when lines reorder, but layout animation only exists in `domMax`.
+  It loads lazily after first paint, so the initial bundle stays small.
+
 ## Not finished
 
 Said plainly, so nothing here is a surprise.
@@ -171,9 +186,11 @@ Said plainly, so nothing here is a surprise.
   too irregular for the wide gaps rule to be trustworthy. DLR has no vehicle ids in its
   feed, so trains cannot be counted.
 - **No dark theme.**
-- **The live outage test was not run on production.** Overwriting the production
-  secret to simulate TfL being down was not done without the owner's approval, so that
-  behaviour is shown locally and in tests rather than on the live site.
+- **The outage test was not run on production, by decision.** Simulating TfL being down
+  would mean overwriting the live secret with an invalid one, and the owner chose not to
+  do that on the live site. The same behaviour was exercised against the real TfL API on
+  a local Worker with real persisted storage (success, stale fallback, typed 503), and is
+  covered by unit tests. That local verification stands as the evidence.
 - **Forced timeout was only unit tested**, not exercised against a local Worker.
 - **An uncached `/api/snapshot` costs 8 to 19 ms of CPU**, above the documented 10 ms
   free tier figure, which Cloudflare did not enforce. The 45 second cache means most

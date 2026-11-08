@@ -78,9 +78,9 @@ Run on a local Worker against the real TfL API with real persisted storage:
   least proven number.
 - **Weekday peak and overnight** were not observed. Everything here is a Sunday
   morning to early afternoon.
-- **The outage test was not run on the production site.** It would have meant
-  overwriting the production secret with an invalid one, which was not done without the
-  owner's say so. The same behaviour was exercised locally as above.
+- **The outage test was not run on the production site, by decision.** It would have
+  meant overwriting the production secret with an invalid one, and the owner chose not
+  to do that. The same behaviour was exercised locally as above.
 - **A forced upstream timeout** was only covered by unit tests.
 - **A physical phone** has not been used to check the live site by the owner. Layout
   was checked in a mobile emulation at 320, 375, 768 and 1280 pixels, with no
