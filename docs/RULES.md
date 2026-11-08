@@ -41,8 +41,11 @@ plain language `reason`, and `confidence` (`high`, `medium`, `low`).
 
 ## Step 1: guards, applied before any rule
 
-1. **No usable arrivals** (missing, failed, malformed, or older than 240 s at
-   `now`): `unknown`, rule `no-arrivals`, confidence low.
+1. **No usable arrivals** (missing, failed, malformed, empty, or older than 240 s
+   at `now`): `unknown`, rule `no-arrivals`, confidence low. An empty feed, or
+   one where no prediction can be tied to a train, cannot tell a quiet line from a
+   broken feed, so it is treated as missing. This is the price of never raising a
+   false alarm: a line with no predictions at all is not flagged.
 2. **Network wide quiet**: if at least 5 lines have fresh summaries and 70
    percent or more of them show fewer than 3 vehicles within 15 minutes, the
    cause is service hours or a feed fault, not any one line. Rules 1 and 3 then
@@ -72,10 +75,12 @@ Fires `mismatch` when **either**:
 
 - fewer than 3 distinct vehicles are due within 15 minutes (1 for Waterloo and
   City, a two train line), or
-- at least 8 vehicles are due but one direction has none (only checked when the
-  feed supplies directions, since 10 to 30 percent of predictions lack one).
+- at least 8 vehicles with a known direction are due but one direction has none
+  (only vehicles with a direction count here, since 10 to 30 percent of
+  predictions lack one).
 
-Confidence: high when no vehicle is due within 30 minutes, otherwise medium.
+Confidence: high when no vehicle is due within 15 minutes (the feed still holds
+trains, but none are close), otherwise medium.
 
 Why 3: healthy Tube lines showed 10 to 68 vehicles within 15 minutes on Sunday
 morning (Circle lowest at 10). 3 is far below any healthy reading yet above
@@ -111,8 +116,9 @@ Official: Good Service or Minor Delays. Observed: trains far apart.
 The metric is the **typical headway**: for each platform with at least 3
 predicted vehicles, take the median gap between consecutive vehicles, then take
 the median of those across platforms. Fires `mismatch` when it is 15 minutes
-or more and at least 5 platforms were measured. Confidence: high from 25
-minutes, low if fewer than 10 platforms were measured, otherwise medium.
+or more and at least 5 platforms were measured. Confidence: low if fewer than
+10 platforms were measured (this wins over the next one), otherwise high from 25
+minutes, otherwise medium.
 
 Why the median and not the largest gap: the single largest gap on a healthy
 line reached 21 minutes (Metropolitan), which would raise false alarms. The
