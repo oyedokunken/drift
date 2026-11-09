@@ -87,11 +87,18 @@ finding.
 All thresholds are named constants in `packages/engine/src/config.ts`, each with its
 origin. Every rule, with examples, is in [docs/RULES.md](docs/RULES.md).
 
-| Rule                    | Fires when                                                                                      |
-| ----------------------- | ----------------------------------------------------------------------------------------------- |
-| Quiet while good        | Status is Good Service but fewer than 3 trains are due in 15 minutes, or one direction has none |
-| Flowing while suspended | Status is Suspended, Closed or Not Running yet 6 or more trains are due                         |
-| Wide gaps               | Good Service or Minor Delays, but typical spacing between trains is 15 minutes or more          |
+| Rule                    | Fires when                                                                                            |
+| ----------------------- | ----------------------------------------------------------------------------------------------------- |
+| Quiet while good        | Status is Good Service but fewer than 3 trains are due in 15 minutes, or one direction has none       |
+| Flowing while suspended | Status is Suspended, Closed or Not Running yet 6 or more trains are due                               |
+| Wide gaps               | Good Service or Minor Delays, but the typical gap between trains at a platform is 15 minutes or more  |
+| Long waits              | Good Service or Minor Delays, but 30 percent or more of platforms wait 20 minutes or more for a train |
+| No trains               | Good Service, a fresh feed with no trains for the line, in service hours, while other lines run       |
+
+Wide gaps and long waits work per platform (the next train wait and the gap after it),
+not on a whole line count, so a line losing part of its service cannot hide behind busy
+platforms. Wide gaps used to be unreachable on live data and was fixed after review;
+the history is in the [changelog](CHANGELOG.md).
 
 Partial closures, planned works, Severe Delays and missing data never produce a
 mismatch. They resolve to "unknown". A network wide quiet guard stops a feed fault or
@@ -204,8 +211,13 @@ things changed once the real numbers were in.
 
 Said plainly, so nothing here is a surprise.
 
+- **The time of day baseline is not built.** The rules compare against fixed
+  thresholds, not against what is normal for a platform at that hour. A platform that
+  loses every train drops out of the feed and cannot be seen, so a line losing whole
+  platforms is caught only when enough others show long waits or the line goes silent.
+  This is the next piece of work.
 - **No real mismatch has been observed.** In the hours Drift was watched the network
-  was healthy, so every verdict was "in step" or "unknown". The three rules are proven
+  was healthy, so every verdict was "in step" or "unknown". The five rules are proven
   by tests and fixtures, not by a real disruption. Rule 2 in particular (flowing while
   suspended) has never been seen against a real suspension.
 - **Thresholds are calibrated on one day**, a Sunday from morning to early afternoon.
@@ -237,6 +249,8 @@ data.
 
 ## What I would do next
 
+- Build the time of day baseline per platform, then compare current trains per platform
+  with it.
 - Watch it through a weekday peak, an overnight period and a real disruption, then
   recalibrate the thresholds and confirm the flowing while suspended rule.
 - Add a dark theme.

@@ -69,10 +69,54 @@ Run on a local Worker against the real TfL API with real persisted storage:
 | Invalid key and empty storage      | HTTP 503, typed body, `Retry-After: 30`, never a bare 500      |
 | Key in any log, header or response | Never, in any of the above                                     |
 
+## Per platform rules, checked live (2026-11-09)
+
+After the engine changed to measure the wait and gap per platform (rules 3 to 5 in
+`docs/RULES.md`), the new engine was run against the live TfL feed at 15:37 London time
+on a Monday. Official statuses came from TfL's Line Status API, which is the source of
+the public status page, and were compared by eye with
+`tfl.gov.uk/tube-dlr-overground/status/` fetched at the same time. Both showed Central
+and Metropolitan on Minor Delays and every other Tube line on Good Service.
+
+| Line             | Official     | Verdict | Trains in 15 min | Platforms | Long waits | Median gap |
+| ---------------- | ------------ | ------- | ---------------- | --------- | ---------- | ---------- |
+| Bakerloo         | Good Service | in step | 23               | 50        | 0          | 5 min      |
+| Central          | Minor Delays | in step | 57               | 94        | 0          | 5 min      |
+| Circle           | Good Service | in step | 12               | 49        | 0          | 10 min     |
+| District         | Good Service | in step | 55               | 118       | 3          | 5 min      |
+| Hammersmith City | Good Service | in step | 30               | 79        | 6          | 10 min     |
+| Jubilee          | Good Service | in step | 39               | 55        | 0          | 3 min      |
+| Metropolitan     | Minor Delays | in step | 25               | 68        | 1          | 7 min      |
+| Northern         | Good Service | in step | 73               | 109       | 0          | 3 min      |
+| Piccadilly       | Good Service | in step | 55               | 105       | 0          | 5 min      |
+| Victoria         | Good Service | in step | 26               | 32        | 0          | 2 min      |
+| Waterloo & City  | Good Service | in step | 2                | 3         | 0          | 29 min     |
+
+What this shows:
+
+- **No false alarm** on 11 healthy lines on a weekday afternoon. The worst margins were
+  Hammersmith City at 6 of 79 platforms waiting 20 minutes or more (7.6 percent, against
+  a 30 percent bar) and a 10 minute median gap on Hammersmith City and Circle (against
+  15).
+- **Waterloo and City** shows a 29 minute median gap because it has 3 platforms and most show a single
+  train inside the window, so the gap is a lower bound. It has fewer than the 5 platforms needed
+  to trust a gap, so the verdict is "in step" with medium confidence, which is the
+  minimum sample guard doing its job. It is the doubtful case: a two train line is
+  always a small sample.
+- **No new rule fired for real.** Wide gaps, long waits and no trains are proven by
+  end to end tests from raw predictions and by this single live snapshot staying quiet,
+  not by a real disruption. This is one snapshot, not a calibration. The thresholds were
+  set from the Sunday morning data in `docs/RULES.md` and this check is the first
+  weekday data point against them.
+- **Service hours for rule 5 (07:00 to 22:00 London time)** were chosen to sit inside
+  the published first and last trains and were not checked against the timetable API.
+  The window is deliberately narrow, so the cost of being wrong is a missed alarm at the
+  edges, not a false one.
+
 ## Not verified, said plainly
 
 - **No real mismatch was seen.** The network was healthy for the whole session, so none
-  of the three rules fired for real. They are proven by tests and fixtures only.
+  of the rules fired for real. They are proven by tests and fixtures only.
   Whether the verdicts are right during a real disruption of these kinds is untested.
 - **No real suspension was ever seen**, so the flowing while suspended threshold is the
   least proven number.
