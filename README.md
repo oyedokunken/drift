@@ -263,6 +263,12 @@ Checked on a Samsung S23 5G in Chrome, on MTN mobile data. Sample mode at `/?sam
 showed 3 of 11 lines drifting with all three mismatch cards, the full line list and the
 three footer links.
 
+## A note on the commit history
+
+I removed the AI co-author trailer lines from the commit messages with a one time
+history rewrite and force push. Authors, dates and file contents are unchanged. How AI
+was used is documented in [CLAUDE.md](CLAUDE.md) and in [docs/prompts](docs/prompts).
+
 ## Licence and attribution
 
 MIT, see [LICENSE](LICENSE). An independent project using TfL open data. Powered by
