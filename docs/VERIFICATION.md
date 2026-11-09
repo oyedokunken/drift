@@ -113,6 +113,21 @@ What this shows:
   The window is deliberately narrow, so the cost of being wrong is a missed alarm at the
   edges, not a false one.
 
+### CPU cost of the per platform summary
+
+`summarise` and `evaluate` were timed in Node on the four line fixture (469 predictions),
+before and after the change, on a busy Windows laptop, so the figures are noisy:
+
+| Step        | Before                                                              | After                                                       |
+| ----------- | ------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `summarise` | 1.0 to 1.6 microseconds per prediction (0.5 to 0.65 on a quiet run) | 0.9 to 1.2 microseconds per prediction (0.5 on a quiet run) |
+| `evaluate`  | 10 to 19 microseconds per 4 lines                                   | 11 to 15 microseconds per 4 lines                           |
+
+There is no measurable change. At that rate the roughly 4,000 predictions of a full Tube
+refresh cost a few milliseconds in `summarise`, against 25 to 45 ms to parse the JSON,
+which dominates. This is a local Node measurement, not a Cloudflare one: the change was
+not deployed, so no `wrangler tail` CPU figure exists for it yet.
+
 ## Not verified, said plainly
 
 - **No real mismatch was seen.** The network was healthy for the whole session, so none
