@@ -108,10 +108,31 @@ What this shows:
   not by a real disruption. This is one snapshot, not a calibration. The thresholds were
   set from the Sunday morning data in `docs/RULES.md` and this check is the first
   weekday data point against them.
-- **Service hours for rule 5 (07:00 to 22:00 London time)** were chosen to sit inside
-  the published first and last trains and were not checked against the timetable API.
-  The window is deliberately narrow, so the cost of being wrong is a missed alarm at the
-  edges, not a false one.
+- **Service hours for rule 5 (07:00 to 22:00 London time) are unchecked.** I probed TfL's
+  per station timetable endpoint (`/Line/{id}/Timetable/{stop}`) on 2026-11-09 and it was
+  not quick or reliable enough to trust. It returned data for only 5 of the 11 lines, only
+  for the three stations sampled per line, and the first and last departures were
+  inconsistent (first trains at 12:00 on weekdays, which is wrong, and Sunday last trains
+  between 20:30 and 21:00 at the sampled stations, which looks too early). What it did
+  suggest is that weekday, Friday and Saturday last departures run to about 00:13 to 00:56,
+  well after 22:00. The Sunday evening end is the open question, so a live check at
+  about 21:30 London time on a Sunday is scheduled below. The window is deliberately
+  narrow, so the cost of being wrong at the start or end is a missed alarm, not a false
+  one, except where a line really stops before 22:00 and its status still reads Good
+  Service.
+
+### Scheduled live checks, still to come
+
+Recorded below as each runs, with the rule that fired (if any) and whether it was a real
+problem or a false alarm. Each run uses the same code as the branch and the real feed.
+
+| Label                     | London time                     | Status  |
+| ------------------------- | ------------------------------- | ------- |
+| Evening                   | about 19:00, Monday 2026-11-09  | pending |
+| Late evening              | about 23:00, Monday 2026-11-09  | pending |
+| Early morning             | about 05:30, Tuesday 2026-11-10 | pending |
+| Weekend, Saturday daytime | about 11:00, 2026-11-14         | pending |
+| Weekend, Sunday evening   | about 21:30, 2026-11-15         | pending |
 
 ### CPU cost of the per platform summary
 
