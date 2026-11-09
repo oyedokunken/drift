@@ -14,8 +14,11 @@ import {
   CLOSED_MAX_VEHICLES,
   FLOWING_HIGH_VEHICLES,
   FLOWING_MIN_VEHICLES,
+  LONG_WAIT_HIGH_SHARE,
+  LONG_WAIT_PLATFORM_SHARE,
+  LONG_WAIT_SEC,
   LOPSIDED_MIN_TOTAL,
-  MIN_PLATFORMS_FOR_HEADWAY,
+  MIN_PLATFORMS_MEASURED,
   NEAR_THRESHOLD_MARGIN,
   NETWORK_MIN_LINES,
   NETWORK_QUIET_SHARE,
@@ -45,6 +48,7 @@ function observedFrom(summary: ArrivalSummary): Observed {
     outbound15: summary.outbound15,
     headwaySec: summary.headwaySec,
     platformsMeasured: summary.platformsMeasured,
+    longWaitPlatforms: summary.longWaitPlatforms,
   };
 }
 
@@ -110,13 +114,15 @@ function evaluateRunning(
     }
   }
 
-  const { headwaySec, platformsMeasured } = summary;
-  const measurable =
-    headwaySec !== null && platformsMeasured >= MIN_PLATFORMS_FOR_HEADWAY;
+  const { headwaySec, platformsMeasured, longWaitPlatforms } = summary;
+  const measurable = platformsMeasured >= MIN_PLATFORMS_MEASURED;
+  const longWaitShare =
+    platformsMeasured === 0 ? 0 : longWaitPlatforms / platformsMeasured;
+  const smallSample = platformsMeasured < SMALL_SAMPLE_PLATFORMS;
 
-  if (measurable && headwaySec >= WIDE_HEADWAY_SEC) {
+  if (measurable && headwaySec !== null && headwaySec >= WIDE_HEADWAY_SEC) {
     let confidence: Confidence = 'medium';
-    if (platformsMeasured < SMALL_SAMPLE_PLATFORMS) confidence = 'low';
+    if (smallSample) confidence = 'low';
     else if (headwaySec >= WIDE_HEADWAY_HIGH_SEC) confidence = 'high';
     return {
       outcome: 'mismatch',
@@ -126,14 +132,30 @@ function evaluateRunning(
     };
   }
 
+  if (measurable && longWaitShare >= LONG_WAIT_PLATFORM_SHARE) {
+    let confidence: Confidence = 'medium';
+    if (smallSample) confidence = 'low';
+    else if (longWaitShare >= LONG_WAIT_HIGH_SHARE) confidence = 'high';
+    return {
+      outcome: 'mismatch',
+      ruleId: 'long-waits',
+      reason: `Official status is ${label} but ${longWaitPlatforms} of ${platformsMeasured} platforms have no train due for ${LONG_WAIT_SEC / 60} minutes or more.`,
+      confidence,
+    };
+  }
+
   const nearQuiet = summary.vehicles15 < floor * (1 + NEAR_THRESHOLD_MARGIN);
   const nearWide =
-    measurable && headwaySec > WIDE_HEADWAY_SEC * (1 - NEAR_THRESHOLD_MARGIN);
+    measurable &&
+    headwaySec !== null &&
+    headwaySec > WIDE_HEADWAY_SEC * (1 - NEAR_THRESHOLD_MARGIN);
+  const nearLongWait =
+    measurable && longWaitShare > LONG_WAIT_PLATFORM_SHARE * (1 - NEAR_THRESHOLD_MARGIN);
   return {
     outcome: 'match',
     ruleId: 'in-step',
     reason: 'Live trains are consistent with the official status.',
-    confidence: !measurable || nearQuiet || nearWide ? 'medium' : 'high',
+    confidence: !measurable || nearQuiet || nearWide || nearLongWait ? 'medium' : 'high',
   };
 }
 

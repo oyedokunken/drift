@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   flowingVerdict,
   gapsVerdict,
+  longWaitsVerdict,
   quietVerdict,
   unknownVerdict,
   verdict,
@@ -93,6 +94,13 @@ describe('liveFigure', () => {
     });
   });
 
+  it('shows the share of platforms waiting long for long waits', () => {
+    expect(liveFigure(longWaitsVerdict('central'))).toEqual({
+      value: 50,
+      label: 'percent of platforms wait 20 min or more',
+    });
+  });
+
   it('has no figure when there was no live reading', () => {
     expect(liveFigure(unknownVerdict('central'))).toBeNull();
   });
@@ -102,6 +110,7 @@ describe('text', () => {
   it('has a title for every rule and a label for every outcome', () => {
     expect(ruleTitle('quiet-while-good')).toBe('Quiet while good');
     expect(ruleTitle('no-arrivals')).toBe('No live data');
+    expect(ruleTitle('long-waits')).toBe('Long waits');
     expect(OUTCOME_LABEL).toEqual({
       mismatch: 'Drift detected',
       match: 'In step',
@@ -152,6 +161,25 @@ describe('trackReading', () => {
     });
   });
 
+  it('draws the share of platforms waiting long against its threshold', () => {
+    expect(trackReading(longWaitsVerdict('central'))).toEqual({
+      unit: 'percent',
+      value: 50,
+      threshold: 30,
+      domain: 60,
+      limit: 'ceiling',
+    });
+  });
+
+  it('draws a zero share when no platform could be measured', () => {
+    const empty = longWaitsVerdict('central');
+    const reading = trackReading({
+      ...empty,
+      observed: empty.observed && { ...empty.observed, platformsMeasured: 0 },
+    });
+    expect(reading?.value).toBe(0);
+  });
+
   it('draws nothing without live data or for an unknown verdict', () => {
     expect(trackReading(unknownVerdict('central'))).toBeNull();
     expect(
@@ -197,6 +225,13 @@ describe('track words and shares', () => {
     expect(floor && trackCaption(floor)).toBe('Needs at least 3 trains');
     expect(ceiling && trackCaption(ceiling)).toBe('Alarm at 6 trains or more');
     expect(minutes && trackCaption(minutes)).toBe('Alarm at 15 minutes apart or more');
+    const percent = trackReading(longWaitsVerdict('central'));
+    expect(percent && trackCaption(percent)).toBe(
+      'Alarm at 30 percent of platforms waiting 20 minutes or more',
+    );
+    expect(percent && trackDescription(percent)).toBe(
+      '50 percent of platforms waiting 20 minutes or more. Alarm at 30 percent of platforms waiting 20 minutes or more.',
+    );
   });
 
   it('describes the whole track in one sentence', () => {
@@ -221,6 +256,7 @@ describe('track words and shares', () => {
         outbound15: 45,
         headwaySec: 120,
         platformsMeasured: 40,
+        longWaitPlatforms: 0,
       },
     });
     const reading = trackReading(busy);

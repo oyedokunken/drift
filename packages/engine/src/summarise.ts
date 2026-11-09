@@ -1,9 +1,5 @@
 import type { ArrivalSummary, LineId, Prediction } from '@drift/shared';
-import {
-  FAR_HORIZON_SEC,
-  MIN_PREDICTIONS_PER_PLATFORM,
-  NEAR_HORIZON_SEC,
-} from './config.ts';
+import { FAR_HORIZON_SEC, LONG_WAIT_SEC, NEAR_HORIZON_SEC } from './config.ts';
 
 function median(values: readonly number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
@@ -13,12 +9,26 @@ function median(values: readonly number[]): number {
   return ((sorted[middle - 1] ?? upper) + upper) / 2;
 }
 
-/** The median gap between consecutive trains at one platform, or null with too few trains. */
-function platformHeadway(nearestByVehicle: ReadonlyMap<string, number>): number | null {
-  if (nearestByVehicle.size < MIN_PREDICTIONS_PER_PLATFORM) return null;
-  const times = [...nearestByVehicle.values()].sort((a, b) => a - b);
-  const gaps = times.slice(1).map((time, index) => time - (times[index] ?? 0));
-  return median(gaps);
+interface PlatformMeasure {
+  /** Seconds until the next train. */
+  readonly waitSec: number;
+  /**
+   * Seconds from the next train to the one after it. With only one train inside the
+   * horizon the following train is at least a horizon away, so this is a lower bound.
+   */
+  readonly gapSec: number;
+}
+
+/** The next train wait and the gap after it at one platform, or null with no train due. */
+function measurePlatform(
+  nearestByVehicle: ReadonlyMap<string, number>,
+): PlatformMeasure | null {
+  const [first, second] = [...nearestByVehicle.values()].sort((a, b) => a - b);
+  if (first === undefined) return null;
+  return {
+    waitSec: first,
+    gapSec: second === undefined ? FAR_HORIZON_SEC - first : second - first,
+  };
 }
 
 /**
@@ -61,9 +71,9 @@ export function summarise(
     platforms.set(key, byVehicle);
   }
 
-  const headways = [...platforms.values()]
-    .map(platformHeadway)
-    .filter((headway): headway is number => headway !== null);
+  const measures = [...platforms.values()]
+    .map(measurePlatform)
+    .filter((measure): measure is PlatformMeasure => measure !== null);
 
   return {
     lineId,
@@ -73,7 +83,8 @@ export function summarise(
     vehicles30: vehicles30.size,
     inbound15: inbound15.size,
     outbound15: outbound15.size,
-    headwaySec: headways.length === 0 ? null : median(headways),
-    platformsMeasured: headways.length,
+    headwaySec: measures.length === 0 ? null : median(measures.map((m) => m.gapSec)),
+    platformsMeasured: measures.length,
+    longWaitPlatforms: measures.filter((m) => m.waitSec >= LONG_WAIT_SEC).length,
   };
 }

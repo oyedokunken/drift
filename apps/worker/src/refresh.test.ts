@@ -61,6 +61,7 @@ describe('refreshSummaries', () => {
       outbound15: 5,
       headwaySec: 200,
       platformsMeasured: 30,
+      longWaitPlatforms: 0,
     };
     store.summaries.set('northern', earlier);
 

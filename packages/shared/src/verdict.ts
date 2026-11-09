@@ -8,6 +8,7 @@ export const RULE_IDS = [
   'quiet-while-good',
   'flowing-while-suspended',
   'wide-gaps',
+  'long-waits',
   'closed-hours',
   'in-step',
   'partial-status',
@@ -26,6 +27,7 @@ export const observedSchema = z.object({
   outbound15: z.number().int().nonnegative(),
   headwaySec: z.number().nonnegative().nullable(),
   platformsMeasured: z.number().int().nonnegative(),
+  longWaitPlatforms: z.number().int().nonnegative(),
 });
 
 export const verdictSchema = z.object({

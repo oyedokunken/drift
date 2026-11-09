@@ -73,6 +73,7 @@ describe('API routes', () => {
       outbound15: 10,
       headwaySec: 300,
       platformsMeasured: 20,
+      longWaitPlatforms: 0,
     } satisfies ArrivalSummary);
     const response = await get('/api/snapshot');
     expect(response.status).toBe(200);

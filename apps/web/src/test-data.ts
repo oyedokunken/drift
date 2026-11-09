@@ -13,6 +13,7 @@ export function verdict(lineId: LineId, overrides: Partial<Verdict> = {}): Verdi
       outbound15: 15,
       headwaySec: 300,
       platformsMeasured: 40,
+      longWaitPlatforms: 0,
     },
     outcome: 'match',
     ruleId: 'in-step',
@@ -31,6 +32,7 @@ export const quietVerdict = (lineId: LineId): Verdict =>
       outbound15: 0,
       headwaySec: 600,
       platformsMeasured: 12,
+      longWaitPlatforms: 0,
     },
     outcome: 'mismatch',
     ruleId: 'quiet-while-good',
@@ -57,11 +59,30 @@ export const gapsVerdict = (lineId: LineId): Verdict =>
       outbound15: 6,
       headwaySec: 1080,
       platformsMeasured: 30,
+      longWaitPlatforms: 0,
     },
     outcome: 'mismatch',
     ruleId: 'wide-gaps',
     reason: 'Official status is Good Service but trains are typically 18 minutes apart.',
     confidence: 'medium',
+  });
+
+export const longWaitsVerdict = (lineId: LineId): Verdict =>
+  verdict(lineId, {
+    observed: {
+      vehicles15: 20,
+      vehicles30: 24,
+      inbound15: 10,
+      outbound15: 10,
+      headwaySec: 300,
+      platformsMeasured: 40,
+      longWaitPlatforms: 20,
+    },
+    outcome: 'mismatch',
+    ruleId: 'long-waits',
+    reason:
+      'Official status is Good Service but 20 of 40 platforms have no train due for 20 minutes or more.',
+    confidence: 'high',
   });
 
 export const unknownVerdict = (

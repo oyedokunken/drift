@@ -41,6 +41,7 @@ function summary(lineId: LineId, fetchedAt: string): ArrivalSummary {
     outbound15: vehicles15 - half,
     headwaySec: lineId === 'piccadilly' ? 18 * 60 : 5 * 60,
     platformsMeasured: lineId === 'piccadilly' ? 30 : 40,
+    longWaitPlatforms: 0,
   };
 }
 

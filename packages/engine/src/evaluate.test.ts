@@ -51,6 +51,7 @@ function summary(overrides: Partial<ArrivalSummary> = {}): ArrivalSummary {
     outbound15: 15,
     headwaySec: 300,
     platformsMeasured: 40,
+    longWaitPlatforms: 0,
     ...overrides,
   };
 }
@@ -340,6 +341,49 @@ describe('rule 3: wide gaps', () => {
   });
 });
 
+describe('rule 4: long waits', () => {
+  it.each([
+    ['29 percent of platforms', 29, 100, 'match', 'medium'],
+    ['exactly 30 percent', 3, 10, 'mismatch', 'medium'],
+    ['30 percent with a large sample', 30, 100, 'mismatch', 'medium'],
+    ['half the platforms', 50, 100, 'mismatch', 'high'],
+    ['half the platforms, small sample', 3, 6, 'mismatch', 'low'],
+    ['no platform waits long', 0, 40, 'match', 'high'],
+    ['near the bar, a match', 25, 100, 'match', 'medium'],
+    ['too few platforms to trust', 4, 4, 'match', 'medium'],
+  ])('%s', (_name, longWaitPlatforms, platformsMeasured, outcome, confidence) => {
+    const verdict = one(
+      status('piccadilly', 10),
+      summary({ lineId: 'piccadilly', longWaitPlatforms, platformsMeasured }),
+    );
+    expect(verdict).toMatchObject({ outcome, confidence });
+    expect(verdict.ruleId).toBe(outcome === 'mismatch' ? 'long-waits' : 'in-step');
+  });
+
+  it('says how many platforms wait and for how long', () => {
+    const verdict = one(
+      status('piccadilly', 10),
+      summary({ lineId: 'piccadilly', longWaitPlatforms: 20, platformsMeasured: 40 }),
+    );
+    expect(verdict.reason).toBe(
+      'Official status is Good Service but 20 of 40 platforms have no train due for 20 minutes or more.',
+    );
+  });
+
+  it('prefers the wide gaps rule when both apply', () => {
+    const verdict = one(
+      status('piccadilly', 10),
+      summary({
+        lineId: 'piccadilly',
+        headwaySec: 1200,
+        longWaitPlatforms: 30,
+        platformsMeasured: 40,
+      }),
+    );
+    expect(verdict.ruleId).toBe('wide-gaps');
+  });
+});
+
 describe('network wide quiet guard', () => {
   const ids: LineId[] = [
     'central',
@@ -440,6 +484,7 @@ describe('shape and determinism', () => {
       outbound15: 15,
       headwaySec: 300,
       platformsMeasured: 40,
+      longWaitPlatforms: 0,
     });
   });
 });

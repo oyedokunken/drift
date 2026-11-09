@@ -1,5 +1,5 @@
 import { config } from '@drift/engine';
-import type { LineId, Verdict } from '@drift/shared';
+import type { LineId, Observed, Verdict } from '@drift/shared';
 
 interface LineNames {
   readonly name: string;
@@ -73,6 +73,7 @@ const RULE_TITLES: Readonly<Record<Verdict['ruleId'], string>> = {
   'quiet-while-good': 'Quiet while good',
   'flowing-while-suspended': 'Flowing while suspended',
   'wide-gaps': 'Wide gaps',
+  'long-waits': 'Long waits',
   'closed-hours': 'Closed hours',
   'in-step': 'In step',
   'partial-status': 'Partial or planned status',
@@ -104,7 +105,16 @@ export interface LiveFigure {
   readonly label: string;
 }
 
-/** What the live data showed: trains due soon, or the gap between trains for wide gaps. */
+/** The share of measured platforms whose next train is a long wait away, as a percentage. */
+function longWaitPercent(observed: Observed): number {
+  if (observed.platformsMeasured === 0) return 0;
+  return Math.round((100 * observed.longWaitPlatforms) / observed.platformsMeasured);
+}
+
+/**
+ * What the live data showed: trains due soon, the gap between trains for wide gaps, or
+ * the share of platforms waiting long.
+ */
 export function liveFigure(verdict: Verdict): LiveFigure | null {
   const { observed } = verdict;
   if (observed === null) return null;
@@ -112,6 +122,12 @@ export function liveFigure(verdict: Verdict): LiveFigure | null {
     return {
       value: Math.round(observed.headwaySec / 60),
       label: 'minutes between trains',
+    };
+  }
+  if (verdict.ruleId === 'long-waits') {
+    return {
+      value: longWaitPercent(observed),
+      label: `percent of platforms wait ${config.LONG_WAIT_SEC / 60} min or more`,
     };
   }
   const { vehicles15 } = observed;
@@ -131,7 +147,7 @@ export function liveFigure(verdict: Verdict): LiveFigure | null {
  * is stopped, or while trains are too far apart.
  */
 export interface TrackReading {
-  readonly unit: 'trains' | 'minutes';
+  readonly unit: 'trains' | 'minutes' | 'percent';
   readonly value: number;
   readonly threshold: number;
   readonly domain: number;
@@ -143,6 +159,9 @@ const TRAINS_DOMAIN = config.FLOWING_HIGH_VEHICLES * 2;
 
 /** The axis runs to twice the wide gap threshold, past the "unambiguous" gap. */
 const MINUTES_DOMAIN = (config.WIDE_HEADWAY_SEC * 2) / 60;
+
+/** The axis runs to twice the long wait share threshold. */
+const PERCENT_DOMAIN = config.LONG_WAIT_PLATFORM_SHARE * 200;
 
 /** Suspended, Closed and Not Running read as "should be stopped". */
 function isDown(verdict: Verdict): boolean {
@@ -190,6 +209,16 @@ export function trackReading(verdict: Verdict): TrackReading | null {
     };
   }
 
+  if (verdict.ruleId === 'long-waits') {
+    return {
+      unit: 'percent',
+      value: longWaitPercent(observed),
+      threshold: config.LONG_WAIT_PLATFORM_SHARE * 100,
+      domain: PERCENT_DOMAIN,
+      limit: 'ceiling',
+    };
+  }
+
   const reading = trainsReading(verdict, observed.vehicles15);
   const lopsided =
     verdict.outcome === 'mismatch' &&
@@ -201,25 +230,37 @@ export function trackReading(verdict: Verdict): TrackReading | null {
 const plural = (count: number, unit: string): string =>
   `${count} ${unit}${count === 1 ? '' : 's'}`;
 
-const quantity = (count: number, unit: TrackReading['unit']): string =>
-  unit === 'trains' ? plural(count, 'train') : plural(count, 'minute');
+const quantity = (count: number, unit: TrackReading['unit']): string => {
+  if (unit === 'percent') return `${count} percent`;
+  return unit === 'trains' ? plural(count, 'train') : plural(count, 'minute');
+};
 
 /** The rule of the threshold, in words, printed under the track. */
 export function trackCaption(reading: TrackReading): string {
   const amount = quantity(reading.threshold, reading.unit);
   if (reading.unit === 'minutes') return `Alarm at ${amount} apart or more`;
+  if (reading.unit === 'percent') {
+    return `Alarm at ${amount} of platforms waiting ${config.LONG_WAIT_SEC / 60} minutes or more`;
+  }
   return reading.limit === 'floor'
     ? `Needs at least ${amount}`
     : `Alarm at ${amount} or more`;
 }
 
+function trackMeasured(reading: TrackReading): string {
+  switch (reading.unit) {
+    case 'trains':
+      return `${plural(reading.value, 'train')} due in 15 minutes`;
+    case 'minutes':
+      return `Trains about ${plural(reading.value, 'minute')} apart`;
+    case 'percent':
+      return `${reading.value} percent of platforms waiting ${config.LONG_WAIT_SEC / 60} minutes or more`;
+  }
+}
+
 /** The whole track as one sentence, for people who cannot see it. */
 export function trackDescription(reading: TrackReading): string {
-  const measured =
-    reading.unit === 'trains'
-      ? `${plural(reading.value, 'train')} due in 15 minutes`
-      : `Trains about ${plural(reading.value, 'minute')} apart`;
-  return `${measured}. ${trackCaption(reading)}.`;
+  return `${trackMeasured(reading)}. ${trackCaption(reading)}.`;
 }
 
 /** Where the fill ends and the threshold sits, as shares of the axis from 0 to 1. */

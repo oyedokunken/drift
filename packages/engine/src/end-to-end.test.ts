@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { LineId, LineStatus, Prediction, Verdict } from '@drift/shared';
+import fixture from '../fixtures/predictions-2026-11-08-sunday-morning.json' with { type: 'json' };
 import { evaluate } from './evaluate.ts';
 import { summarise } from './summarise.ts';
 
@@ -44,11 +45,15 @@ function every(spacing: number, first = 3): number[] {
   return due;
 }
 
-function lineWith(lineId: LineId, platformTimes: readonly (readonly number[])[]) {
+function lineWith(
+  lineId: LineId,
+  platformTimes: readonly (readonly number[])[],
+  at = NOW,
+) {
   return summarise(
     lineId,
     platformTimes.flatMap((due, index) => platform(lineId, index + 1, due)),
-    NOW,
+    at,
   );
 }
 
@@ -116,40 +121,73 @@ describe('end to end, from raw predictions to a verdict', () => {
     });
   });
 
-  /*
-   * The cases below describe what the product should detect and does not yet. Each is
-   * written as the behaviour we want, and `it.fails` keeps CI green while it is not met.
-   * When the engine is fixed the test starts passing, vitest reports that, and the
-   * `.fails` is removed.
-   */
+  describe('a line with half its platforms stranded', () => {
+    const frequent = Array.from({ length: 5 }, () => every(4));
+    const stranded = Array.from({ length: 5 }, () => [24]);
 
-  it.fails(
-    'flags a line where half the platforms wait far too long, though the line total looks healthy',
-    () => {
-      const frequent = Array.from({ length: 5 }, () => every(4));
-      const stranded = Array.from({ length: 5 }, () => [24]);
-      const verdict = verdictFor('central', [
-        ...healthyNetwork(),
-        lineWith('central', [...frequent, ...stranded]),
-      ]);
-      expect(verdict.outcome).toBe('mismatch');
-    },
-  );
-
-  it.fails('can reach the wide gaps rule from live shaped predictions', () => {
-    const verdicts = [20, 22, 25, 28].map((spacing) => {
-      const platforms = Array.from({ length: 8 }, () => [
-        2,
-        2 + spacing,
-        2 + 2 * spacing,
-      ]);
-      return verdictFor('central', [...healthyNetwork(), lineWith('central', platforms)]);
+    it('is flagged though the line total of trains looks healthy', () => {
+      const line = lineWith('central', [...frequent, ...stranded]);
+      expect(line.vehicles15).toBeGreaterThanOrEqual(15);
+      const verdict = verdictFor('central', [...healthyNetwork(), line]);
+      expect(verdict).toMatchObject({
+        outcome: 'mismatch',
+        ruleId: 'long-waits',
+        confidence: 'high',
+      });
+      expect(verdict.reason).toContain('5 of 10 platforms');
     });
-    expect(verdicts.some((verdict) => verdict.ruleId === 'wide-gaps')).toBe(true);
+
+    it('is not flagged when only a few platforms wait long', () => {
+      const line = lineWith('central', [
+        ...Array.from({ length: 9 }, () => every(4)),
+        [24],
+      ]);
+      expect(verdictFor('central', [...healthyNetwork(), line]).outcome).toBe('match');
+    });
   });
 
-  it.fails('treats a Good Service line with no trains at all as a mismatch', () => {
-    const verdict = verdictFor('central', [...healthyNetwork(), lineWith('central', [])]);
-    expect(verdict.outcome).toBe('mismatch');
+  describe('wide gaps', () => {
+    it.each([15, 20, 25, 28])(
+      'fires from live shaped predictions with trains %i minutes apart',
+      (spacing) => {
+        const platforms = Array.from({ length: 8 }, () => [2, 2 + spacing]);
+        const verdict = verdictFor('central', [
+          ...healthyNetwork(),
+          lineWith('central', platforms),
+        ]);
+        expect(verdict).toMatchObject({ outcome: 'mismatch', ruleId: 'wide-gaps' });
+      },
+    );
+
+    it('fires when only one train is due at each platform in the whole window', () => {
+      const platforms = Array.from({ length: 8 }, () => [3]);
+      const verdict = verdictFor('central', [
+        ...healthyNetwork(),
+        lineWith('central', platforms),
+      ]);
+      expect(verdict).toMatchObject({ outcome: 'mismatch', ruleId: 'wide-gaps' });
+    });
+
+    it('does not fire on a ten minute service, the slowest healthy line sampled', () => {
+      const platforms = Array.from({ length: 8 }, () => every(10, 4));
+      const verdict = verdictFor('central', [
+        ...healthyNetwork(),
+        lineWith('central', platforms),
+      ]);
+      expect(verdict).toMatchObject({ outcome: 'match', ruleId: 'in-step' });
+    });
+  });
+
+  describe('on real captured data (Sunday morning, 2026-11-08)', () => {
+    const captured = fixture.lines as unknown as Record<string, Prediction[]>;
+    const lineIds = Object.keys(captured) as LineId[];
+
+    it('raises no mismatch on the four healthy lines sampled', () => {
+      const summaries = lineIds.map((lineId) =>
+        summarise(lineId, captured[lineId] ?? [], NOW),
+      );
+      const verdicts = evaluate(lineIds.map(status), summaries, NOW);
+      expect(verdicts.filter((verdict) => verdict.outcome === 'mismatch')).toEqual([]);
+    });
   });
 });

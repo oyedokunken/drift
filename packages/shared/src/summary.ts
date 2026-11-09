@@ -20,10 +20,16 @@ export const arrivalSummarySchema = z.object({
   /** Distinct vehicles due within 15 minutes whose direction is known, by direction. */
   inbound15: count,
   outbound15: count,
-  /** Typical gap between trains in seconds, or null when too few platforms could be measured. */
+  /**
+   * Typical gap between trains in seconds: the median over platforms of the gap between
+   * the first and second train, or a lower bound when only one is due inside the horizon.
+   * Null when no platform has a train.
+   */
   headwaySec: z.number().nonnegative().nullable(),
-  /** Platforms with enough predictions to measure a gap. */
+  /** Platforms with at least one train due inside the horizon. */
   platformsMeasured: count,
+  /** Platforms whose next train is due at or beyond the long wait threshold. */
+  longWaitPlatforms: count,
 });
 
 export type ArrivalSummary = z.infer<typeof arrivalSummarySchema>;
