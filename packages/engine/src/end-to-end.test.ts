@@ -67,16 +67,21 @@ const HEALTHY_LINES: readonly LineId[] = [
 ];
 
 /** Six busy lines, so the network wide guard sees a normal network around the line under test. */
-const healthyNetwork = () =>
+const healthyNetwork = (at = NOW) =>
   HEALTHY_LINES.map((lineId) =>
     lineWith(
       lineId,
       Array.from({ length: 8 }, () => every(4)),
+      at,
     ),
   );
 
-function verdictFor(lineId: LineId, summaries: ReturnType<typeof lineWith>[]): Verdict {
-  const verdicts = evaluate([lineId, ...HEALTHY_LINES].map(status), summaries, NOW);
+function verdictFor(
+  lineId: LineId,
+  summaries: ReturnType<typeof lineWith>[],
+  at = NOW,
+): Verdict {
+  const verdicts = evaluate([lineId, ...HEALTHY_LINES].map(status), summaries, at);
   const found = verdicts.find((verdict) => verdict.lineId === lineId);
   if (found === undefined) throw new Error(`No verdict for ${lineId}`);
   return found;
@@ -175,6 +180,63 @@ describe('end to end, from raw predictions to a verdict', () => {
         lineWith('central', platforms),
       ]);
       expect(verdict).toMatchObject({ outcome: 'match', ruleId: 'in-step' });
+    });
+  });
+
+  describe('a Good Service line with no trains', () => {
+    const empty = (at: Date) =>
+      verdictFor('central', [...healthyNetwork(at), lineWith('central', [], at)], at);
+
+    it('is a mismatch during service hours', () => {
+      expect(empty(NOW)).toMatchObject({ outcome: 'mismatch', ruleId: 'no-trains' });
+    });
+
+    it.each([
+      ['overnight', '2026-11-08T02:00:00Z'],
+      ['before the first trains', '2026-11-08T05:30:00Z'],
+      ['after the last trains', '2026-11-08T23:30:00Z'],
+    ])('stays unknown %s', (_name, at) => {
+      expect(empty(new Date(at))).toMatchObject({
+        outcome: 'unknown',
+        ruleId: 'no-arrivals',
+      });
+    });
+
+    it('is not a mismatch when the line is Service Closed with no trains', () => {
+      const closed: LineStatus = {
+        lineId: 'central',
+        statuses: [{ severity: 20, label: 'Service Closed' }],
+      };
+      const summaries = [...healthyNetwork(), lineWith('central', [])];
+      const verdicts = evaluate([closed, ...HEALTHY_LINES.map(status)], summaries, NOW);
+      expect(verdicts[0]?.outcome).not.toBe('mismatch');
+    });
+
+    it('stays unknown when the whole feed is empty, as in a TfL outage', () => {
+      const lines: LineId[] = ['central', ...HEALTHY_LINES];
+      const summaries = lines.map((lineId) => lineWith(lineId, []));
+      const verdicts = evaluate(lines.map(status), summaries, NOW);
+      expect(verdicts.every((verdict) => verdict.outcome === 'unknown')).toBe(true);
+    });
+
+    it('stays unknown when two lines go empty together, as when one fetch group fails', () => {
+      const summaries = [
+        ...healthyNetwork(),
+        lineWith('central', []),
+        lineWith('piccadilly', []),
+      ];
+      const lines: LineId[] = ['central', 'piccadilly', ...HEALTHY_LINES];
+      const verdicts = evaluate(lines.map(status), summaries, NOW);
+      expect(verdicts.slice(0, 2).map((verdict) => verdict.outcome)).toEqual([
+        'unknown',
+        'unknown',
+      ]);
+    });
+
+    it('stays unknown when the feed is stale', () => {
+      const old = new Date(NOW.getTime() - 20 * MINUTE * 1000);
+      const summaries = [...healthyNetwork(), lineWith('central', [], old)];
+      expect(verdictFor('central', summaries).outcome).toBe('unknown');
     });
   });
 

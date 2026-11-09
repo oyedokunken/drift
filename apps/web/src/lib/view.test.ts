@@ -101,6 +101,28 @@ describe('liveFigure', () => {
     });
   });
 
+  it('shows no trains for a line with none due', () => {
+    const none = verdict('central', {
+      ruleId: 'no-trains',
+      outcome: 'mismatch',
+      observed: {
+        vehicles15: 0,
+        vehicles30: 0,
+        inbound15: 0,
+        outbound15: 0,
+        headwaySec: null,
+        platformsMeasured: 0,
+        longWaitPlatforms: 0,
+      },
+    });
+    expect(liveFigure(none)).toEqual({ value: 0, label: 'trains due in 15 min' });
+    expect(trackReading(none)).toMatchObject({
+      unit: 'trains',
+      value: 0,
+      limit: 'floor',
+    });
+  });
+
   it('has no figure when there was no live reading', () => {
     expect(liveFigure(unknownVerdict('central'))).toBeNull();
   });
@@ -111,6 +133,7 @@ describe('text', () => {
     expect(ruleTitle('quiet-while-good')).toBe('Quiet while good');
     expect(ruleTitle('no-arrivals')).toBe('No live data');
     expect(ruleTitle('long-waits')).toBe('Long waits');
+    expect(ruleTitle('no-trains')).toBe('No trains');
     expect(OUTCOME_LABEL).toEqual({
       mismatch: 'Drift detected',
       match: 'In step',

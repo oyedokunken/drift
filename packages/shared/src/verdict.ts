@@ -9,6 +9,7 @@ export const RULE_IDS = [
   'flowing-while-suspended',
   'wide-gaps',
   'long-waits',
+  'no-trains',
   'closed-hours',
   'in-step',
   'partial-status',

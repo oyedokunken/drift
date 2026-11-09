@@ -384,6 +384,141 @@ describe('rule 4: long waits', () => {
   });
 });
 
+describe('rule 5: no trains while good', () => {
+  const RUNNING: LineId[] = ['circle', 'district', 'jubilee', 'northern', 'victoria'];
+  const EMPTY = { predictionCount: 0, vehicles15: 0, vehicles30: 0 } as const;
+
+  interface Options {
+    readonly statusSeverity?: number;
+    readonly running?: readonly LineId[];
+    readonly alsoEmpty?: readonly LineId[];
+  }
+
+  /** Central with an empty feed among running lines, evaluated at `at`. */
+  function emptyCentral(at: Date, options: Options = {}): Verdict {
+    const running = options.running ?? RUNNING;
+    const statuses = [
+      status('central', options.statusSeverity ?? 10),
+      ...running.map((id) => status(id, 10)),
+    ];
+    const fetchedAt = new Date(at.getTime() - 30_000).toISOString();
+    const summaries = [
+      summary({ lineId: 'central', fetchedAt, ...EMPTY }),
+      ...running.map((lineId) => summary({ lineId, fetchedAt })),
+      ...(options.alsoEmpty ?? []).map((lineId) =>
+        summary({ lineId, fetchedAt, ...EMPTY }),
+      ),
+    ];
+    const [verdict] = evaluate(statuses, summaries, at);
+    if (!verdict) throw new Error('expected a verdict');
+    return verdict;
+  }
+
+  it('is a mismatch in service hours when the rest of the network runs', () => {
+    const verdict = emptyCentral(NOW);
+    expect(verdict).toMatchObject({
+      outcome: 'mismatch',
+      ruleId: 'no-trains',
+      confidence: 'medium',
+    });
+    expect(verdict.reason).toBe(
+      'Official status is Good Service but no trains are due on this line, while 5 other lines are running.',
+    );
+    expect(verdict.observed).toMatchObject({ vehicles15: 0, vehicles30: 0 });
+  });
+
+  it.each([
+    ['one minute before service hours', '2026-11-08T06:59:00Z'],
+    ['early morning', '2026-11-08T04:30:00Z'],
+    ['exactly the end of service hours', '2026-11-08T22:00:00Z'],
+    ['after midnight', '2026-11-09T00:30:00Z'],
+  ])('stays unknown outside service hours: %s', (_name, at) => {
+    expect(emptyCentral(new Date(at))).toMatchObject({
+      outcome: 'unknown',
+      ruleId: 'no-arrivals',
+    });
+  });
+
+  it('reads service hours in London time, so summer shifts the window', () => {
+    expect(emptyCentral(new Date('2026-07-05T06:30:00Z')).outcome).toBe('mismatch');
+    expect(emptyCentral(new Date('2026-07-05T05:59:00Z')).outcome).toBe('unknown');
+  });
+
+  it('is a mismatch at the very start of service hours', () => {
+    expect(emptyCentral(new Date('2026-11-08T07:00:00Z')).ruleId).toBe('no-trains');
+  });
+
+  it.each([
+    ['Service Closed', 20],
+    ['Planned Closure', 4],
+    ['Part Suspended', 3],
+    ['Suspended', 2],
+    ['Minor Delays', 9],
+  ])('does not apply when the status is %s', (_name, statusSeverity) => {
+    const verdict = emptyCentral(NOW, { statusSeverity });
+    expect(verdict.ruleId).not.toBe('no-trains');
+    expect(verdict.outcome).not.toBe('mismatch');
+  });
+
+  it('stays unknown when too few other lines are running', () => {
+    expect(emptyCentral(NOW, { running: RUNNING.slice(0, 3) })).toMatchObject({
+      outcome: 'unknown',
+      ruleId: 'no-arrivals',
+    });
+  });
+
+  it('stays unknown when several lines are empty at once, a sign of a feed fault', () => {
+    expect(emptyCentral(NOW, { alsoEmpty: ['bakerloo'] })).toMatchObject({
+      outcome: 'unknown',
+      ruleId: 'no-arrivals',
+    });
+  });
+
+  it('stays unknown when the network is quiet', () => {
+    const quiet = RUNNING.map((lineId) =>
+      summary({ lineId, vehicles15: 1, vehicles30: 1 }),
+    );
+    const statuses = ['central' as LineId, ...RUNNING].map((id) => status(id, 10));
+    const [verdict] = evaluate(
+      statuses,
+      [summary({ lineId: 'central', ...EMPTY }), ...quiet],
+      NOW,
+    );
+    expect(verdict).toMatchObject({ outcome: 'unknown', ruleId: 'no-arrivals' });
+  });
+
+  it('stays unknown when the empty summary is stale', () => {
+    const statuses = ['central' as LineId, ...RUNNING].map((id) => status(id, 10));
+    const stale = summary({
+      lineId: 'central',
+      fetchedAt: new Date(NOW.getTime() - 600_000).toISOString(),
+      ...EMPTY,
+    });
+    const [verdict] = evaluate(
+      statuses,
+      [stale, ...RUNNING.map((lineId) => summary({ lineId }))],
+      NOW,
+    );
+    expect(verdict).toMatchObject({ outcome: 'unknown', ruleId: 'no-arrivals' });
+  });
+
+  it('stays unknown when predictions exist but none can be tied to a train', () => {
+    const statuses = ['central' as LineId, ...RUNNING].map((id) => status(id, 10));
+    const unattributed = summary({
+      lineId: 'central',
+      predictionCount: 120,
+      vehicles15: 0,
+      vehicles30: 0,
+    });
+    const [verdict] = evaluate(
+      statuses,
+      [unattributed, ...RUNNING.map((lineId) => summary({ lineId }))],
+      NOW,
+    );
+    expect(verdict).toMatchObject({ outcome: 'unknown', ruleId: 'no-arrivals' });
+  });
+});
+
 describe('network wide quiet guard', () => {
   const ids: LineId[] = [
     'central',

@@ -73,6 +73,29 @@ export const MIN_PLATFORMS_MEASURED = 5;
 /** Below this many measured platforms the wait and gap verdicts have low confidence. */
 export const SMALL_SAMPLE_PLATFORMS = 10;
 
+/**
+ * Service hours inside which every Tube line is expected to run, in London local
+ * time, as minutes after midnight. Deliberately narrower than the published first and
+ * last trains so that the start and end of service never raise an alarm.
+ */
+export const OPERATING_START_MIN = 7 * 60;
+export const OPERATING_END_MIN = 22 * 60;
+
+/** Time zone the operating hours are read in, so daylight saving needs no handling. */
+export const OPERATING_TIME_ZONE = 'Europe/London';
+
+/**
+ * Lines that must be running normally (at least QUIET_MIN_VEHICLES due) before another
+ * line with no trains at all can be called a mismatch.
+ */
+export const NO_TRAINS_MIN_RUNNING_LINES = 4;
+
+/**
+ * Lines with a fresh but empty feed at once that point to a feed fault. The worker fetches
+ * lines in groups, so one empty response would empty several lines together.
+ */
+export const NO_TRAINS_FAULT_LINES = 2;
+
 /** With Service Closed, this many vehicles or fewer still agrees with the status. */
 export const CLOSED_MAX_VEHICLES = 2;
 

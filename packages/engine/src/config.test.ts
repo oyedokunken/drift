@@ -30,6 +30,11 @@ describe('engine thresholds', () => {
     expect(config.LONG_WAIT_HIGH_SHARE).toBeLessThanOrEqual(1);
   });
 
+  it('keeps the operating hours inside one day and in order', () => {
+    expect(config.OPERATING_START_MIN).toBeLessThan(config.OPERATING_END_MIN);
+    expect(config.OPERATING_END_MIN).toBeLessThanOrEqual(24 * 60);
+  });
+
   it('keeps the per line quiet floor at or below the general floor', () => {
     for (const floor of Object.values(config.QUIET_MIN_VEHICLES_BY_LINE)) {
       expect(floor).toBeLessThanOrEqual(config.QUIET_MIN_VEHICLES);

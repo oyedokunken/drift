@@ -23,12 +23,15 @@ import {
   NETWORK_MIN_LINES,
   NETWORK_QUIET_SHARE,
   NETWORK_QUIET_VEHICLES,
+  NO_TRAINS_FAULT_LINES,
+  NO_TRAINS_MIN_RUNNING_LINES,
   QUIET_MIN_VEHICLES,
   QUIET_MIN_VEHICLES_BY_LINE,
   SMALL_SAMPLE_PLATFORMS,
   WIDE_HEADWAY_HIGH_SEC,
   WIDE_HEADWAY_SEC,
 } from './config.ts';
+import { isWithinOperatingHours } from './hours.ts';
 
 interface Result {
   readonly outcome: Outcome;
@@ -56,19 +59,34 @@ function ageSec(summary: ArrivalSummary, now: Date): number {
   return (now.getTime() - Date.parse(summary.fetchedAt)) / 1000;
 }
 
-/**
- * A summary is usable when it is fresh and describes real trains. An empty feed, or
- * one where no prediction could be tied to a vehicle, is treated as missing data
- * because it cannot tell a quiet line from a broken feed.
- */
-function isUsable(
+function isFresh(
   summary: ArrivalSummary | undefined,
   now: Date,
 ): summary is ArrivalSummary {
   if (summary === undefined) return false;
   const age = ageSec(summary, now);
-  if (Number.isNaN(age) || age > ARRIVALS_MAX_AGE_SEC) return false;
-  return summary.predictionCount > 0 && summary.vehicles30 > 0;
+  return !Number.isNaN(age) && age <= ARRIVALS_MAX_AGE_SEC;
+}
+
+/**
+ * A summary is usable when it is fresh and describes real trains. A feed where no
+ * prediction could be tied to a vehicle is treated as missing data, because it cannot
+ * tell a quiet line from a broken feed.
+ */
+function isUsable(
+  summary: ArrivalSummary | undefined,
+  now: Date,
+): summary is ArrivalSummary {
+  return isFresh(summary, now) && summary.predictionCount > 0 && summary.vehicles30 > 0;
+}
+
+/** What the other lines in the same refresh look like, for judging an empty line. */
+interface Network {
+  readonly quiet: boolean;
+  /** Lines with at least the general quiet floor of trains due soon. */
+  readonly runningLines: number;
+  /** Lines whose fresh feed holds no predictions at all. */
+  readonly emptyLines: number;
 }
 
 /** True when so many lines are quiet at once that service hours or a feed fault is likelier. */
@@ -76,6 +94,16 @@ function isNetworkQuiet(usable: readonly ArrivalSummary[]): boolean {
   if (usable.length < NETWORK_MIN_LINES) return false;
   const quiet = usable.filter((s) => s.vehicles15 < NETWORK_QUIET_VEHICLES).length;
   return quiet / usable.length >= NETWORK_QUIET_SHARE;
+}
+
+function describeNetwork(summaries: readonly ArrivalSummary[], now: Date): Network {
+  const usable = summaries.filter((summary) => isUsable(summary, now));
+  return {
+    quiet: isNetworkQuiet(usable),
+    runningLines: usable.filter((s) => s.vehicles15 >= QUIET_MIN_VEHICLES).length,
+    emptyLines: summaries.filter((s) => isFresh(s, now) && s.predictionCount === 0)
+      .length,
+  };
 }
 
 function quietFloor(lineId: LineId): number {
@@ -159,6 +187,35 @@ function evaluateRunning(
   };
 }
 
+/**
+ * A Good Service line whose feed is fresh but holds no predictions. This only counts as
+ * a mismatch when nothing else explains the silence: it is inside service hours, the
+ * rest of the network is running, and it is not one of several lines emptied at once,
+ * which would point to a feed fault. Otherwise the line stays unknown.
+ */
+function evaluateEmpty(
+  label: string,
+  classification: Classification,
+  summary: ArrivalSummary,
+  network: Network,
+  now: Date,
+): Result | null {
+  const explained =
+    !classification.allGoodService ||
+    summary.predictionCount !== 0 ||
+    network.quiet ||
+    network.runningLines < NO_TRAINS_MIN_RUNNING_LINES ||
+    network.emptyLines >= NO_TRAINS_FAULT_LINES ||
+    !isWithinOperatingHours(now);
+  if (explained) return null;
+  return {
+    outcome: 'mismatch',
+    ruleId: 'no-trains',
+    reason: `Official status is ${label} but no trains are due on this line, while ${network.runningLines} other lines are running.`,
+    confidence: 'medium',
+  };
+}
+
 function evaluateDown(label: string, summary: ArrivalSummary): Result {
   if (summary.vehicles15 >= FLOWING_MIN_VEHICLES) {
     return {
@@ -229,7 +286,7 @@ function statusOnlyResult(kind: StatusKind, label: string): Result | null {
 function evaluateLine(
   status: LineStatus,
   summary: ArrivalSummary | undefined,
-  networkQuiet: boolean,
+  network: Network,
   now: Date,
 ): Verdict {
   const classification = classify(status.statuses);
@@ -246,6 +303,10 @@ function evaluateLine(
   if (statusOnly !== null) return verdict(statusOnly, null);
 
   if (!isUsable(summary, now)) {
+    if (isFresh(summary, now)) {
+      const empty = evaluateEmpty(label, classification, summary, network, now);
+      if (empty !== null) return verdict(empty, observedFrom(summary));
+    }
     return verdict(
       {
         outcome: 'unknown',
@@ -264,7 +325,7 @@ function evaluateLine(
   if (classification.kind === 'closed')
     return verdict(evaluateClosed(label, summary), observed);
 
-  if (networkQuiet) {
+  if (network.quiet) {
     return verdict(
       {
         outcome: 'unknown',
@@ -294,10 +355,9 @@ export function evaluate(
   now: Date,
 ): Verdict[] {
   const byLine = new Map(summaries.map((summary) => [summary.lineId, summary]));
-  const usable = [...byLine.values()].filter((summary) => isUsable(summary, now));
-  const networkQuiet = isNetworkQuiet(usable);
+  const network = describeNetwork([...byLine.values()], now);
 
   return statuses.map((status) =>
-    evaluateLine(status, byLine.get(status.lineId), networkQuiet, now),
+    evaluateLine(status, byLine.get(status.lineId), network, now),
   );
 }
