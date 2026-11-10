@@ -1,6 +1,7 @@
 import { m } from 'framer-motion';
 import { useEffect, useState, type ReactNode } from 'react';
 import type { Snapshot } from '@drift/shared';
+import { BusSearch } from './components/bus-search.tsx';
 import { Age } from './components/freshness.tsx';
 import { Footer } from './components/footer.tsx';
 import { Hero } from './components/hero.tsx';
@@ -16,6 +17,7 @@ import {
 } from './components/states.tsx';
 import { isSampleRequested } from './lib/sample-mode.ts';
 import { useOnline } from './lib/use-clock.ts';
+import { routeFromSearch } from './lib/use-bus.ts';
 import { useSnapshot } from './lib/use-snapshot.ts';
 import {
   MODE_LABELS,
@@ -190,7 +192,7 @@ function Page({
   );
 }
 
-function LiveApp() {
+function LiveApp({ search }: { readonly search: string }) {
   const { status, data, failures, refreshing, refresh } = useSnapshot();
   const online = useOnline();
 
@@ -226,6 +228,7 @@ function LiveApp() {
           />
         </>
       )}
+      <BusSearch initialRoute={routeFromSearch(search)} />
     </Page>
   );
 }
@@ -275,5 +278,5 @@ function SampleApp() {
 }
 
 export function App({ search = window.location.search }: { readonly search?: string }) {
-  return isSampleRequested(search) ? <SampleApp /> : <LiveApp />;
+  return isSampleRequested(search) ? <SampleApp /> : <LiveApp search={search} />;
 }

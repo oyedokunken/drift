@@ -109,6 +109,7 @@ const RULE_TITLES: Readonly<Record<Verdict['ruleId'], string>> = {
   'wide-gaps': 'Wide gaps',
   'long-waits': 'Long waits',
   'no-trains': 'No trains',
+  'no-buses': 'No buses',
   'closed-hours': 'Closed hours',
   'in-step': 'In step',
   'partial-status': 'Partial or planned status',
