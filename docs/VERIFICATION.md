@@ -175,6 +175,101 @@ refresh cost a few milliseconds in `summarise`, against 25 to 45 ms to parse the
 which dominates. This is a local Node measurement, not a Cloudflare one: the change was
 not deployed, so no `wrangler tail` CPU figure exists for it yet.
 
+## More modes and buses, checked live (2026-11-10)
+
+The real engine from this branch was run against the live TfL feed with a script outside
+the repository (it reads the key from the gitignored `.dev.vars` and never prints it).
+Official statuses came from the Line Status API. They were compared with
+`tfl.gov.uk/tube-dlr-overground/status/` fetched a few minutes later, and matched, with
+one difference from the time gap (the District had moved from Severe and Minor Delays to
+Minor Delays). A real disruption was on the network at the time:
+
+- Mildmay: severe delays between Willesden Junction and Clapham Junction (a signal
+  failure at Shepherd's Bush) and minor delays on the whole line.
+- Suffragette: no service between South Tottenham and Barking Riverside.
+- Victoria: severe delays (a track fault at Brixton). Central, District, Jubilee and
+  Northern on minor delays.
+
+### Band 1: evening, 19:57 London, Tuesday 2026-11-10
+
+| Line             | Mode           | Official                       | Verdict | Rule                | Platforms | Long waits | Median gap |
+| ---------------- | -------------- | ------------------------------ | ------- | ------------------- | --------- | ---------- | ---------- |
+| Bakerloo         | tube           | Good Service                   | in step | in-step             | 47        | 0          | 4 min      |
+| Central          | tube           | Minor Delays                   | in step | in-step             | 94        | 0          | 3 min      |
+| Circle           | tube           | Good Service                   | in step | in-step             | 48        | 0          | 9 min      |
+| District         | tube           | Severe Delays and Minor Delays | unknown | partial-status      | 116       | 0          | 5 min      |
+| DLR              | dlr            | Good Service                   | in step | in-step             | 98        | 1          | 5 min      |
+| Elizabeth line   | elizabeth-line | Good Service                   | in step | in-step             | 91        | 2          | 6 min      |
+| Hammersmith City | tube           | Good Service                   | in step | in-step             | 84        | 4          | 8 min      |
+| Jubilee          | tube           | Minor Delays                   | in step | in-step             | 55        | 0          | 2 min      |
+| Liberty          | overground     | Good Service                   | unknown | not-measurable      | 3         | 0          | 0 min      |
+| Lioness          | overground     | Good Service                   | unknown | not-measurable      | 40        | 0          | 15 min     |
+| Metropolitan     | tube           | Good Service                   | in step | in-step             | 77        | 3          | 5 min      |
+| Mildmay          | overground     | Severe Delays and Minor Delays | unknown | partial-status      | 62        | 0          | 5 min      |
+| Northern         | tube           | Minor Delays                   | in step | in-step             | 108       | 0          | 2 min      |
+| Piccadilly       | tube           | Good Service                   | in step | in-step             | 104       | 0          | 4 min      |
+| Suffragette      | overground     | Part Closure                   | unknown | partial-status      | 11        | 4          | 8 min      |
+| Victoria         | tube           | Severe Delays                  | unknown | delays-unverifiable | 32        | 0          | 2 min      |
+| Waterloo & City  | tube           | Good Service                   | in step | in-step             | 3         | 0          | 3 min      |
+| Weaver           | overground     | Good Service                   | unknown | not-measurable      | 54        | 2          | 15 min     |
+| Windrush         | overground     | Good Service                   | in step | in-step             | 61        | 0          | 4 min      |
+
+**No rule fired on any of the 19 lines, so there is no real problem or false alarm to
+classify for the lines.** What the run does show:
+
+- **Weaver and Lioness are the reason wide gaps is off for the Overground.** Both sat at
+  a median gap of 15 minutes on Good Service. With the Tube's 15 minute bar, Weaver would
+  have fired a wide gaps mismatch on a healthy line. They resolve to unknown instead.
+  This is the one place where a live check changed a design decision.
+- **Suffragette** is the only line with long waits at all (4 of 11 platforms), which is
+  consistent with the real part closure and is held back by its status: a partial status is
+  unknown by design.
+- **Mildmay and Victoria** were on severe delays with trains running normally by the
+  counts (Mildmay 62 platforms, Victoria a 2 minute median gap). Drift does not call that a
+  mismatch, because delayed trains still run: unknown, by design.
+- **DLR** was judged in step from per platform waits and gaps with no vehicle count, on
+  98 platforms.
+- **Elizabeth line** was in step. 2 of 91 platforms waited 20 minutes, against the 40
+  percent bar.
+
+### Bus routes, checked at the same time
+
+Run with no earlier reading of the route, so the no buses rule could not fire.
+
+| Route | Official        | Verdict | Rule           | Stops | Long waits | Median gap | Why                                            |
+| ----- | --------------- | ------- | -------------- | ----- | ---------- | ---------- | ---------------------------------------------- |
+| 207   | Good Service    | in step | in-step        | 90    | 5          | 5 min      | A very frequent route, 385 predictions         |
+| 73    | Good Service    | in step | in-step        | 63    | 0          | 6 min      | A frequent route                               |
+| 490   | Good Service    | in step | in-step        | 84    | 3          | 9 min      | A less frequent route, a bus about every 9 min |
+| 18    | Special Service | unknown | partial-status | 93    | 3          | 5 min      | Special Service is a partial status            |
+| W11   | Special Service | unknown | partial-status | 23    | 6          | 11 min     | Special Service, and only 23 stops             |
+| N207  | Good Service    | unknown | not-measurable | 0     | 0          | none       | A night route, 0 predictions at 19:57          |
+| N18   | Special Service | unknown | partial-status | 0     | 0          | none       | A night route, 0 predictions at 19:57          |
+
+No bus rule fired, so again nothing to classify. The three routes of different frequency
+asked for (a very frequent day route, 207, a less frequent one, 490, and night routes,
+N207 and N18) all resolved sensibly. The night routes were the least informative: a night
+route is always unknown, and at 19:57 it had no buses to show.
+
+### Band 2
+
+A second band is required for every mode and for the night routes, and has not run yet.
+It is planned for after 23:30 London time tonight (the night routes should be running
+then) or early tomorrow morning, and will be recorded here with any rule that fires. If
+this section still says "not run", it did not happen.
+
+Status of the bands: band 1 (evening) done, band 2 not run.
+
+### Verified, and not
+
+- **Verified:** the new rules and profiles stay quiet on a healthy evening across all
+  modes, the real DLR feed has blank vehicle ids and is judged without counting trains,
+  the Overground low frequency lines resolve to unknown rather than raising an alarm, and
+  the official statuses match TfL's public page.
+- **Not verified:** that any new rule fires correctly in a real disruption (none did), the
+  Sunday windows, the night routes while running, and the Cloudflare CPU for the new lines
+  and for a bus check.
+
 ## Not verified, said plainly
 
 - **No real mismatch was seen.** The network was healthy for the whole session, so none
