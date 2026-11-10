@@ -13,13 +13,16 @@ export const arrivalSummarySchema = z.object({
   fetchedAt: z.iso.datetime(),
   /** Predictions received, including ones that could not be attributed to a train. */
   predictionCount: count,
-  /** Distinct vehicles due within 15 minutes. */
-  vehicles15: count,
-  /** Distinct vehicles due within the whole 30 minute horizon. */
-  vehicles30: count,
+  /**
+   * Distinct vehicles due within 15 minutes. Null on a mode whose feed carries no vehicle
+   * ids (DLR), where a train cannot be told apart from the same train at another station.
+   */
+  vehicles15: count.nullable(),
+  /** Distinct vehicles due within the whole lookahead window, or null as above. */
+  vehicles30: count.nullable(),
   /** Distinct vehicles due within 15 minutes whose direction is known, by direction. */
-  inbound15: count,
-  outbound15: count,
+  inbound15: count.nullable(),
+  outbound15: count.nullable(),
   /**
    * Typical gap between trains in seconds: the median over platforms of the gap between
    * the first and second train, or a lower bound when only one is due inside the horizon.

@@ -1,3 +1,5 @@
+import { modeOfLine, type LineId, type ModeId } from '@drift/shared';
+
 /**
  * Every threshold the engine uses. Each value is explained in docs/RULES.md and
  * was chosen from live TfL data observed on 2026-11-08 (a Sunday morning), so
@@ -122,3 +124,145 @@ export const CLOSED_MAX_VEHICLES = 2;
 
 /** A match this close to a threshold is reported with medium rather than high confidence. */
 export const NEAR_THRESHOLD_MARGIN = 0.25;
+
+/** Which rules a line may raise. A rule that is off can never fire, whatever the data. */
+export interface RuleSet {
+  /**
+   * Rules that count distinct vehicles: quiet while good, one sided service, flowing
+   * while suspended and closed hours. Needs a feed with usable vehicle ids.
+   */
+  readonly vehicleCounts: boolean;
+  /** Typical gap between trains at a platform. */
+  readonly wideGaps: boolean;
+  /** Share of platforms with no train due for a long time. */
+  readonly longWaits: boolean;
+  /** A Good Service line whose feed holds no predictions at all. */
+  readonly noTrains: boolean;
+}
+
+/**
+ * Everything the engine needs to know about a mode. Rules read from a profile, so a new
+ * mode is a new entry here and not a fork of the engine.
+ */
+export interface ModeProfile {
+  /** How far ahead a train counts, in seconds. Every time threshold below must fit in it. */
+  readonly lookaheadSec: number;
+  /**
+   * False when the feed leaves `vehicleId` blank. Each prediction at a platform is then
+   * one train, and distinct vehicles are not counted at all.
+   */
+  readonly vehicleIdsUsable: boolean;
+  /**
+   * True when every rule, and not only no trains, is held to the service window. The
+   * Tube relies on its network wide quiet guard instead, which was proven on Tube data.
+   */
+  readonly allRulesInWindow: boolean;
+  readonly rules: RuleSet;
+  /** Per line replacements for `rules`, for lines that behave unlike the rest of the mode. */
+  readonly lineRules: Readonly<Partial<Record<LineId, RuleSet>>>;
+  readonly wideHeadwaySec: number;
+  readonly wideHeadwayHighSec: number;
+  readonly longWaitSec: number;
+  readonly longWaitShare: number;
+  readonly longWaitHighShare: number;
+  readonly minPlatforms: number;
+  readonly smallSamplePlatforms: number;
+  readonly serviceWindows: Readonly<Record<DayType, ServiceWindow>>;
+}
+
+const ALL_RULES: RuleSet = {
+  vehicleCounts: true,
+  wideGaps: true,
+  longWaits: true,
+  noTrains: true,
+};
+
+/** The no trains rule only, for lines too infrequent to judge from a single snapshot. */
+const NO_TRAINS_ONLY: RuleSet = {
+  vehicleCounts: false,
+  wideGaps: false,
+  longWaits: false,
+  noTrains: true,
+};
+
+/** The Tube, as every constant above was set from it. */
+const TUBE_PROFILE: ModeProfile = {
+  lookaheadSec: FAR_HORIZON_SEC,
+  vehicleIdsUsable: true,
+  allRulesInWindow: false,
+  rules: ALL_RULES,
+  lineRules: {},
+  wideHeadwaySec: WIDE_HEADWAY_SEC,
+  wideHeadwayHighSec: WIDE_HEADWAY_HIGH_SEC,
+  longWaitSec: LONG_WAIT_SEC,
+  longWaitShare: LONG_WAIT_PLATFORM_SHARE,
+  longWaitHighShare: LONG_WAIT_HIGH_SHARE,
+  minPlatforms: MIN_PLATFORMS_MEASURED,
+  smallSamplePlatforms: SMALL_SAMPLE_PLATFORMS,
+  serviceWindows: SERVICE_WINDOWS,
+};
+
+/**
+ * The Elizabeth line, from the live feed on 2026-11-10 at 19:30 London time: 108
+ * vehicles, 95 platforms, median gap 5.9 minutes but a 90th percentile gap of 12.6 and
+ * 7 of 94 platforms with a gap of 15 minutes or more. Branches run at different
+ * frequencies, so the spacing is irregular and the wide gaps rule is off. Only 3 of 94
+ * platforms waited 20 minutes, so long waits stays on, with a higher share (40 percent)
+ * than the Tube's because a branch with two trains an hour can wait that long legitimately.
+ */
+const ELIZABETH_PROFILE: ModeProfile = {
+  ...TUBE_PROFILE,
+  allRulesInWindow: true,
+  rules: { ...ALL_RULES, wideGaps: false },
+  longWaitShare: 0.4,
+  longWaitHighShare: 0.6,
+};
+
+/**
+ * The DLR, from the live feed on 2026-11-10 at 19:30 London time. `vehicleId` is blank
+ * on all 271 predictions, so trains cannot be counted. Each prediction at a platform is
+ * a train: median wait 3.2 minutes, median gap 5.0, 90th percentile gap 11.0, 1 of 98
+ * platforms waiting 20 minutes. Those sit well inside the Tube's thresholds, which are
+ * kept. Only the rules that count vehicles are off.
+ */
+const DLR_PROFILE: ModeProfile = {
+  ...TUBE_PROFILE,
+  vehicleIdsUsable: false,
+  allRulesInWindow: true,
+  rules: { ...ALL_RULES, vehicleCounts: false },
+};
+
+/**
+ * The Overground, from the live feed on 2026-11-10 at 19:30 London time. Weaver showed a
+ * median gap of exactly 15.0 minutes on Good Service and Lioness 13.0, so the wide gaps
+ * rule would raise a false alarm on a healthy line and is off for the whole mode.
+ * Liberty has 3 platforms and Suffragette 8, and Liberty, Lioness, Suffragette and
+ * Weaver run a train every 15 to 30 minutes, so none can be judged by counting trains
+ * or waits in one snapshot: they keep only the no trains rule. Mildmay (58 vehicles) and
+ * Windrush (87) are frequent enough to keep the vehicle and long wait rules.
+ */
+const OVERGROUND_PROFILE: ModeProfile = {
+  ...TUBE_PROFILE,
+  allRulesInWindow: true,
+  rules: NO_TRAINS_ONLY,
+  lineRules: {
+    mildmay: { ...ALL_RULES, wideGaps: false },
+    windrush: { ...ALL_RULES, wideGaps: false },
+  },
+};
+
+export const MODE_PROFILES: Readonly<Record<ModeId, ModeProfile>> = {
+  tube: TUBE_PROFILE,
+  'elizabeth-line': ELIZABETH_PROFILE,
+  dlr: DLR_PROFILE,
+  overground: OVERGROUND_PROFILE,
+};
+
+/** The profile for a line, and the rules that apply to that line within it. */
+export function profileOf(lineId: LineId): ModeProfile {
+  return MODE_PROFILES[modeOfLine(lineId)];
+}
+
+export function rulesOf(lineId: LineId): RuleSet {
+  return profileOf(lineId).lineRules[lineId] ?? profileOf(lineId).rules;
+}

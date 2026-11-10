@@ -1,3 +1,4 @@
+import { modeOfLine } from '@drift/shared';
 import type {
   ArrivalSummary,
   Confidence,
@@ -14,9 +15,6 @@ import {
   CLOSED_MAX_VEHICLES,
   FLOWING_HIGH_VEHICLES,
   FLOWING_MIN_VEHICLES,
-  LONG_WAIT_HIGH_SHARE,
-  LONG_WAIT_PLATFORM_SHARE,
-  LONG_WAIT_SEC,
   LOPSIDED_MIN_TOTAL,
   MIN_PLATFORMS_MEASURED,
   NEAR_THRESHOLD_MARGIN,
@@ -27,9 +25,8 @@ import {
   NO_TRAINS_MIN_RUNNING_LINES,
   QUIET_MIN_VEHICLES,
   QUIET_MIN_VEHICLES_BY_LINE,
-  SMALL_SAMPLE_PLATFORMS,
-  WIDE_HEADWAY_HIGH_SEC,
-  WIDE_HEADWAY_SEC,
+  profileOf,
+  rulesOf,
 } from './config.ts';
 import { isWithinOperatingHours } from './hours.ts';
 
@@ -77,7 +74,37 @@ function isUsable(
   summary: ArrivalSummary | undefined,
   now: Date,
 ): summary is ArrivalSummary {
-  return isFresh(summary, now) && summary.predictionCount > 0 && summary.vehicles30 > 0;
+  return isFresh(summary, now) && summary.predictionCount > 0 && hasTrains(summary);
+}
+
+/** On a mode with no vehicle ids a train is known only through a platform it is due at. */
+function hasTrains(summary: ArrivalSummary): boolean {
+  return summary.vehicles30 === null
+    ? summary.platformsMeasured > 0
+    : summary.vehicles30 > 0;
+}
+
+/** The line has enough trains due soon to count as running normally. */
+function isRunning(summary: ArrivalSummary): boolean {
+  return summary.vehicles15 === null
+    ? summary.platformsMeasured >= MIN_PLATFORMS_MEASURED
+    : summary.vehicles15 >= QUIET_MIN_VEHICLES;
+}
+
+function isQuiet(summary: ArrivalSummary): boolean {
+  return summary.vehicles15 === null
+    ? summary.platformsMeasured < MIN_PLATFORMS_MEASURED
+    : summary.vehicles15 < NETWORK_QUIET_VEHICLES;
+}
+
+/**
+ * Whether a line says anything about the network. A line kept to the no trains rule
+ * because it runs too few trains is left out, as a quiet one is normal for it.
+ */
+function isJudgeable(summary: ArrivalSummary): boolean {
+  return (
+    rulesOf(summary.lineId).vehicleCounts || !profileOf(summary.lineId).vehicleIdsUsable
+  );
 }
 
 /** What the other lines in the same refresh look like, for judging an empty line. */
@@ -92,15 +119,17 @@ interface Network {
 /** True when so many lines are quiet at once that service hours or a feed fault is likelier. */
 function isNetworkQuiet(usable: readonly ArrivalSummary[]): boolean {
   if (usable.length < NETWORK_MIN_LINES) return false;
-  const quiet = usable.filter((s) => s.vehicles15 < NETWORK_QUIET_VEHICLES).length;
+  const quiet = usable.filter(isQuiet).length;
   return quiet / usable.length >= NETWORK_QUIET_SHARE;
 }
 
 function describeNetwork(summaries: readonly ArrivalSummary[], now: Date): Network {
-  const usable = summaries.filter((summary) => isUsable(summary, now));
+  const usable = summaries.filter(
+    (summary) => isUsable(summary, now) && isJudgeable(summary),
+  );
   return {
     quiet: isNetworkQuiet(usable),
-    runningLines: usable.filter((s) => s.vehicles15 >= QUIET_MIN_VEHICLES).length,
+    runningLines: usable.filter(isRunning).length,
     emptyLines: summaries.filter((s) => isFresh(s, now) && s.predictionCount === 0)
       .length,
   };
@@ -116,42 +145,48 @@ function evaluateRunning(
   classification: Classification,
   summary: ArrivalSummary,
 ): Result {
+  const profile = profileOf(lineId);
+  const rules = rulesOf(lineId);
   const floor = quietFloor(lineId);
+  const { vehicles15 } = summary;
 
-  if (classification.allGoodService) {
-    if (summary.vehicles15 < floor) {
+  if (classification.allGoodService && rules.vehicleCounts && vehicles15 !== null) {
+    if (vehicles15 < floor) {
       return {
         outcome: 'mismatch',
         ruleId: 'quiet-while-good',
-        reason: `Official status is ${label} but only ${trains(summary.vehicles15)} due in the next 15 minutes.`,
-        confidence: summary.vehicles15 === 0 ? 'high' : 'medium',
+        reason: `Official status is ${label} but only ${trains(vehicles15)} due in the next 15 minutes.`,
+        confidence: vehicles15 === 0 ? 'high' : 'medium',
       };
     }
 
-    const known = summary.inbound15 + summary.outbound15;
-    if (
-      known >= LOPSIDED_MIN_TOTAL &&
-      Math.min(summary.inbound15, summary.outbound15) === 0
-    ) {
+    const inbound = summary.inbound15 ?? 0;
+    const outbound = summary.outbound15 ?? 0;
+    if (inbound + outbound >= LOPSIDED_MIN_TOTAL && Math.min(inbound, outbound) === 0) {
       return {
         outcome: 'mismatch',
         ruleId: 'quiet-while-good',
-        reason: `Official status is ${label} but trains are due in only one direction (${summary.inbound15} inbound, ${summary.outbound15} outbound).`,
+        reason: `Official status is ${label} but trains are due in only one direction (${inbound} inbound, ${outbound} outbound).`,
         confidence: 'medium',
       };
     }
   }
 
   const { headwaySec, platformsMeasured, longWaitPlatforms } = summary;
-  const measurable = platformsMeasured >= MIN_PLATFORMS_MEASURED;
+  const measurable = platformsMeasured >= profile.minPlatforms;
   const longWaitShare =
     platformsMeasured === 0 ? 0 : longWaitPlatforms / platformsMeasured;
-  const smallSample = platformsMeasured < SMALL_SAMPLE_PLATFORMS;
+  const smallSample = platformsMeasured < profile.smallSamplePlatforms;
 
-  if (measurable && headwaySec !== null && headwaySec >= WIDE_HEADWAY_SEC) {
+  if (
+    rules.wideGaps &&
+    measurable &&
+    headwaySec !== null &&
+    headwaySec >= profile.wideHeadwaySec
+  ) {
     let confidence: Confidence = 'medium';
     if (smallSample) confidence = 'low';
-    else if (headwaySec >= WIDE_HEADWAY_HIGH_SEC) confidence = 'high';
+    else if (headwaySec >= profile.wideHeadwayHighSec) confidence = 'high';
     return {
       outcome: 'mismatch',
       ruleId: 'wide-gaps',
@@ -160,31 +195,48 @@ function evaluateRunning(
     };
   }
 
-  if (measurable && longWaitShare >= LONG_WAIT_PLATFORM_SHARE) {
+  if (rules.longWaits && measurable && longWaitShare >= profile.longWaitShare) {
     let confidence: Confidence = 'medium';
     if (smallSample) confidence = 'low';
-    else if (longWaitShare >= LONG_WAIT_HIGH_SHARE) confidence = 'high';
+    else if (longWaitShare >= profile.longWaitHighShare) confidence = 'high';
     return {
       outcome: 'mismatch',
       ruleId: 'long-waits',
-      reason: `Official status is ${label} but ${longWaitPlatforms} of ${platformsMeasured} platforms have no train due for ${LONG_WAIT_SEC / 60} minutes or more.`,
+      reason: `Official status is ${label} but ${longWaitPlatforms} of ${platformsMeasured} platforms have no train due for ${profile.longWaitSec / 60} minutes or more.`,
       confidence,
     };
   }
 
-  const nearQuiet = summary.vehicles15 < floor * (1 + NEAR_THRESHOLD_MARGIN);
+  if (!rules.vehicleCounts && !rules.wideGaps && !rules.longWaits) {
+    return notMeasurable(
+      `Official status is ${label}, but this line runs too few trains for one snapshot to confirm or contradict it.`,
+    );
+  }
+
+  const nearQuiet =
+    rules.vehicleCounts &&
+    vehicles15 !== null &&
+    vehicles15 < floor * (1 + NEAR_THRESHOLD_MARGIN);
   const nearWide =
+    rules.wideGaps &&
     measurable &&
     headwaySec !== null &&
-    headwaySec > WIDE_HEADWAY_SEC * (1 - NEAR_THRESHOLD_MARGIN);
+    headwaySec > profile.wideHeadwaySec * (1 - NEAR_THRESHOLD_MARGIN);
   const nearLongWait =
-    measurable && longWaitShare > LONG_WAIT_PLATFORM_SHARE * (1 - NEAR_THRESHOLD_MARGIN);
+    rules.longWaits &&
+    measurable &&
+    longWaitShare > profile.longWaitShare * (1 - NEAR_THRESHOLD_MARGIN);
   return {
     outcome: 'match',
     ruleId: 'in-step',
     reason: 'Live trains are consistent with the official status.',
     confidence: !measurable || nearQuiet || nearWide || nearLongWait ? 'medium' : 'high',
   };
+}
+
+/** A line or status Drift has no trustworthy way to judge, so it makes no comparison. */
+function notMeasurable(reason: string): Result {
+  return { outcome: 'unknown', ruleId: 'not-measurable', reason, confidence: 'low' };
 }
 
 /**
@@ -194,6 +246,7 @@ function evaluateRunning(
  * which would point to a feed fault. Otherwise the line stays unknown.
  */
 function evaluateEmpty(
+  lineId: LineId,
   label: string,
   classification: Classification,
   summary: ArrivalSummary,
@@ -201,12 +254,13 @@ function evaluateEmpty(
   now: Date,
 ): Result | null {
   const explained =
+    !rulesOf(lineId).noTrains ||
     !classification.allGoodService ||
     summary.predictionCount !== 0 ||
     network.quiet ||
     network.runningLines < NO_TRAINS_MIN_RUNNING_LINES ||
     network.emptyLines >= NO_TRAINS_FAULT_LINES ||
-    !isWithinOperatingHours(now);
+    !isWithinOperatingHours(now, profileOf(lineId).serviceWindows);
   if (explained) return null;
   return {
     outcome: 'mismatch',
@@ -216,27 +270,26 @@ function evaluateEmpty(
   };
 }
 
-function evaluateDown(label: string, summary: ArrivalSummary): Result {
-  if (summary.vehicles15 >= FLOWING_MIN_VEHICLES) {
+function evaluateDown(label: string, vehicles15: number): Result {
+  if (vehicles15 >= FLOWING_MIN_VEHICLES) {
     return {
       outcome: 'mismatch',
       ruleId: 'flowing-while-suspended',
-      reason: `Official status is ${label} but ${trains(summary.vehicles15)} due in the next 15 minutes.`,
-      confidence: summary.vehicles15 >= FLOWING_HIGH_VEHICLES ? 'high' : 'medium',
+      reason: `Official status is ${label} but ${trains(vehicles15)} due in the next 15 minutes.`,
+      confidence: vehicles15 >= FLOWING_HIGH_VEHICLES ? 'high' : 'medium',
     };
   }
-  const nearFlowing =
-    summary.vehicles15 > FLOWING_MIN_VEHICLES * (1 - NEAR_THRESHOLD_MARGIN);
+  const nearFlowing = vehicles15 > FLOWING_MIN_VEHICLES * (1 - NEAR_THRESHOLD_MARGIN);
   return {
     outcome: 'match',
     ruleId: 'in-step',
-    reason: `Official status is ${label} and only ${trains(summary.vehicles15)} due, as expected.`,
+    reason: `Official status is ${label} and only ${trains(vehicles15)} due, as expected.`,
     confidence: nearFlowing ? 'medium' : 'high',
   };
 }
 
-function evaluateClosed(label: string, summary: ArrivalSummary): Result {
-  if (summary.vehicles15 <= CLOSED_MAX_VEHICLES) {
+function evaluateClosed(label: string, vehicles15: number): Result {
+  if (vehicles15 <= CLOSED_MAX_VEHICLES) {
     return {
       outcome: 'match',
       ruleId: 'closed-hours',
@@ -247,7 +300,7 @@ function evaluateClosed(label: string, summary: ArrivalSummary): Result {
   return {
     outcome: 'unknown',
     ruleId: 'closed-hours',
-    reason: `Official status is ${label} but ${trains(summary.vehicles15)} due. This is likely the start or end of service, so no alarm is raised.`,
+    reason: `Official status is ${label} but ${trains(vehicles15)} due. This is likely the start or end of service, so no alarm is raised.`,
     confidence: 'low',
   };
 }
@@ -292,8 +345,10 @@ function evaluateLine(
   const classification = classify(status.statuses);
   const label = status.statuses.map((s) => s.label).join(' and ');
   const official = { severity: classification.driving.severity, label };
+  const profile = profileOf(status.lineId);
   const verdict = (result: Result, observed: Observed | null): Verdict => ({
     lineId: status.lineId,
+    mode: modeOfLine(status.lineId),
     official,
     observed,
     ...result,
@@ -302,9 +357,25 @@ function evaluateLine(
   const statusOnly = statusOnlyResult(classification.kind, label);
   if (statusOnly !== null) return verdict(statusOnly, null);
 
+  if (profile.allRulesInWindow && !isWithinOperatingHours(now, profile.serviceWindows)) {
+    return verdict(
+      notMeasurable(
+        'This is outside the hours Drift trusts for this kind of line, so no comparison is made.',
+      ),
+      null,
+    );
+  }
+
   if (!isUsable(summary, now)) {
     if (isFresh(summary, now)) {
-      const empty = evaluateEmpty(label, classification, summary, network, now);
+      const empty = evaluateEmpty(
+        status.lineId,
+        label,
+        classification,
+        summary,
+        network,
+        now,
+      );
       if (empty !== null) return verdict(empty, observedFrom(summary));
     }
     return verdict(
@@ -320,10 +391,23 @@ function evaluateLine(
 
   const observed = observedFrom(summary);
 
-  if (classification.kind === 'down')
-    return verdict(evaluateDown(label, summary), observed);
-  if (classification.kind === 'closed')
-    return verdict(evaluateClosed(label, summary), observed);
+  if (classification.kind === 'down' || classification.kind === 'closed') {
+    const { vehicles15 } = summary;
+    if (!rulesOf(status.lineId).vehicleCounts || vehicles15 === null) {
+      return verdict(
+        notMeasurable(
+          `Official status is ${label}, but trains cannot be counted on this line, so it cannot be checked.`,
+        ),
+        observed,
+      );
+    }
+    return verdict(
+      classification.kind === 'down'
+        ? evaluateDown(label, vehicles15)
+        : evaluateClosed(label, vehicles15),
+      observed,
+    );
+  }
 
   if (network.quiet) {
     return verdict(

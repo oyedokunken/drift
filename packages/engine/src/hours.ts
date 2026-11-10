@@ -1,4 +1,9 @@
-import { OPERATING_TIME_ZONE, SERVICE_WINDOWS, type DayType } from './config.ts';
+import {
+  OPERATING_TIME_ZONE,
+  SERVICE_WINDOWS,
+  type DayType,
+  type ServiceWindow,
+} from './config.ts';
 
 const clock = new Intl.DateTimeFormat('en-GB', {
   timeZone: OPERATING_TIME_ZONE,
@@ -25,10 +30,13 @@ function dayTypeOf(weekday: string): DayType {
  * True when `now` falls inside the service window for its London day type. An invalid
  * date is outside every window, so a bad clock never raises an alarm.
  */
-export function isWithinOperatingHours(now: Date): boolean {
+export function isWithinOperatingHours(
+  now: Date,
+  windows: Readonly<Record<DayType, ServiceWindow>> = SERVICE_WINDOWS,
+): boolean {
   if (Number.isNaN(now.getTime())) return false;
   const parts = clock.formatToParts(now);
   const minutes = Number(part(parts, 'hour')) * 60 + Number(part(parts, 'minute'));
-  const window = SERVICE_WINDOWS[dayTypeOf(part(parts, 'weekday'))];
+  const window = windows[dayTypeOf(part(parts, 'weekday'))];
   return minutes >= window.startMin && minutes < window.endMin;
 }
