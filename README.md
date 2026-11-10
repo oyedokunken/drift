@@ -95,7 +95,12 @@ It never returns a bare 500.
 Cold start: if the store holds no line summaries, as on empty storage, the first
 request runs one refresh itself instead of waiting for the next cron tick. Concurrent
 requests share that refresh, it is capped at 7 seconds, and if it fails the page still
-gets a valid snapshot with those lines marked "not enough data". If TfL's status feed is
+gets a valid snapshot with those lines marked "not enough data". With 19 lines the cap can
+be too short on completely empty storage: on a local Worker the Elizabeth line alone took
+about 4.5 seconds to download, the cold refresh timed out and the page said "not enough
+data" until the refresh finished in the background and the 45 second snapshot cache
+expired. A deploy to the existing live storage is not affected, because the summaries are
+already there. If TfL's status feed is
 down and nothing has ever been stored, the Worker still answers with the typed 503.
 
 One live incident is not explained. Shortly after a deploy, the site showed "Live data is

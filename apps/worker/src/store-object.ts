@@ -8,6 +8,7 @@ import {
 import { createBusService, type BusOutcome } from './bus.ts';
 import type { Env } from './env.ts';
 import { refreshSummaries, type RefreshReport } from './refresh.ts';
+import { createRefreshRuns } from './refresh-runs.ts';
 import { LINE_GROUPS, REFRESH_PHASES } from './tfl.ts';
 import { productionRuntime } from './runtime.ts';
 import type { Store } from './store.ts';
@@ -51,7 +52,7 @@ export class DriftStore extends DurableObject<Env> implements Store {
     return Promise.resolve(parsed.success ? parsed.data : null);
   }
 
-  private inflight: Promise<RefreshReport> | null = null;
+  private runs: ((phase?: number) => Promise<RefreshReport>) | undefined;
 
   private busService: ReturnType<typeof createBusService> | undefined;
 
@@ -81,22 +82,17 @@ export class DriftStore extends DurableObject<Env> implements Store {
    * visitors on an empty store costs one round of TfL fetches.
    */
   refresh(phase?: number): Promise<RefreshReport> {
-    const { log, upstream } = productionRuntime(this.env);
-    const groups =
-      phase === undefined
-        ? LINE_GROUPS
-        : (REFRESH_PHASES[phase % REFRESH_PHASES.length] ?? LINE_GROUPS);
-    this.inflight ??= refreshSummaries(
-      {
-        upstream,
-        store: this,
-        log,
-        now: () => new Date(),
-      },
-      groups,
-    ).finally(() => {
-      this.inflight = null;
-    });
-    return this.inflight;
+    this.runs ??= createRefreshRuns((selected) => {
+      const { log, upstream } = productionRuntime(this.env);
+      const groups =
+        selected === undefined
+          ? LINE_GROUPS
+          : (REFRESH_PHASES[selected % REFRESH_PHASES.length] ?? LINE_GROUPS);
+      return refreshSummaries(
+        { upstream, store: this, log, now: () => new Date() },
+        groups,
+      );
+    }, REFRESH_PHASES.length);
+    return this.runs(phase);
   }
 }

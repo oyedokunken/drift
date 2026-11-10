@@ -210,7 +210,10 @@ on one tick and five groups for the other modes on the next (`REFRESH_PHASES` in
 Every line is refreshed at least every two minutes, inside the engine's four minute
 freshness limit. The Tube is now refreshed every two minutes, not every minute, which
 costs nothing real because TfL itself serves a response for up to 60 seconds. A cold
-start, with empty storage, refreshes every group at once. Summaries stored before the
+start, with empty storage, refreshes every group at once. A refresh of one phase never
+joins a run of the other, so a slow tick cannot stop the other lines updating (a local run
+found exactly that bug, and `refresh-runs.ts` and its tests fix it); a refresh of every
+group is joined by either phase, since it already covers them. Summaries stored before the
 deploy still parse, so the Tube shows at once and the new lines read "not enough data"
 for at most two minutes.
 

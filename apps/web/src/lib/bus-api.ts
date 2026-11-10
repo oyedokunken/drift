@@ -8,6 +8,13 @@ export type BusLookup =
   | { readonly kind: 'unavailable' }
   | { readonly kind: 'failed' };
 
+/**
+ * How long a bus check may take before the page gives up. A first check after a deploy
+ * also fetches the route list, which took about 5 seconds locally, and the Worker retries
+ * a failing upstream, so this is generous.
+ */
+export const BUS_TIMEOUT_MS = 20_000;
+
 function retryAfter(response: Response): number | null {
   const seconds = Number(response.headers.get('Retry-After'));
   return Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : null;
@@ -23,11 +30,29 @@ export async function fetchBus(
   signal: AbortSignal,
   fetchImpl: typeof fetch = fetch,
 ): Promise<BusLookup> {
+  const timeout = new AbortController();
+  const timer = setTimeout(() => {
+    timeout.abort();
+  }, BUS_TIMEOUT_MS);
+  try {
+    return await ask(route, AbortSignal.any([signal, timeout.signal]), fetchImpl, signal);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function ask(
+  route: string,
+  signal: AbortSignal,
+  fetchImpl: typeof fetch,
+  callerSignal: AbortSignal,
+): Promise<BusLookup> {
   let response: Response;
   try {
     response = await fetchImpl(`/api/bus/${encodeURIComponent(route)}`, { signal });
   } catch (error) {
-    if (signal.aborted) throw error;
+    // A caller's abort means a newer search took over. A timeout is just a failed check.
+    if (callerSignal.aborted) throw error;
     return { kind: 'failed' };
   }
 
