@@ -239,9 +239,12 @@ so 120 a minute for buses is 60 route checks a minute and leaves the key far und
 limit even if every search misses the cache. Searching many different routes cannot
 exceed it, and a route that is not in the stored list is refused without spending any.
 
-The arrivals payload for a busy route is about 350 to 390 KB and parses in 3 to 4 ms in
-Node, so it is parsed in the Durable Object and never in the request handler. The route
-list is parsed there too, once a day.
+The arrivals payload for a busy route is about 340 to 390 KB. A whole check (both
+fetches parsed, summarised and evaluated) measured 5.2 ms for route 207 and 6.6 ms for
+route 18 in Node, and parsing the 340 KB route list took 6.2 ms. If Cloudflare is about
+twice Node, as it was for the Tube, a check is about 10 to 14 ms, which is why it runs in
+the Durable Object and never in the request handler. The route list is parsed there too,
+once a day.
 
 ### Not measured
 

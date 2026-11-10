@@ -158,7 +158,7 @@ Things that differ from the Tube:
 ## Buses (2026-11-10)
 
 - **Route list.** `GET /Line/Mode/bus` returned 348 KB for 675 routes in 3 seconds and
-  re-parses in about 2.5 ms in Node. Every id was one to four letters or digits (`1`,
+  parses, with Zod and reduced to ids and names, in about 6 ms in Node (a bare `JSON.parse` is about 2.5 ms). Every id was one to four letters or digits (`1`,
   `207`, `W11`, `N207`, `X26`). 64 were night routes starting with `N`. The `lineStatuses`
   field in this listing is empty, so a route's status needs its own call.
 - **Status.** `GET /Line/207/Status` returns one line with one or more statuses. Seen:
@@ -175,6 +175,9 @@ Things that differ from the Tube:
 - **Unknown route.** `GET /Line/ZZZ/Arrivals` and `/Status` both returned HTTP 404 with a
   JSON error body, and so did `207;drop`. Drift never sends either: the route is checked
   against the stored list first.
+- **CPU in Node**, wall time, median of 20 runs: a whole check of route 207 (340 KB, both
+  calls parsed, summarised and evaluated) 5.2 ms, route 18 (375 KB) 6.6 ms. Not measured
+  on Cloudflare.
 - **Per stop waits on ten healthy routes** (207, 18, 490, W11, 73, 25, 5, 36, H98, E1):
   median wait 3.9 to 12.1 minutes, median gap 3.6 to 12.0. Stops waiting 20 minutes or
   more: 0 on seven routes, 1 of 85 (490), 1 of 106 (36), 7 of 91 (18, 7.7 percent) and
