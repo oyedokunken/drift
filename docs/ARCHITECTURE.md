@@ -69,20 +69,23 @@ Line groups, balanced by Sunday morning prediction counts:
 
 ## Scope
 
-Tube lines only. The Elizabeth line would fit the CPU budget (its 1 MB parses
-in a few milliseconds), but it does not pass the second test: on real data its
-typical headway was 12.7 minutes with a 30 minute spread across platforms,
-against a 15 minute rule threshold. The headway rule would raise false alarms
-on a healthy Elizabeth line, so it is left out rather than shipped unreliable.
+Version 0.1.0 covered the Tube lines only. The Elizabeth line fit the CPU budget but
+its typical headway on the first look was 12.7 minutes with a 30 minute spread across
+platforms, against a 15 minute threshold, so the wide gaps rule could not be trusted on
+it. Version 0.2.0 adds the Elizabeth line, the DLR and the Overground with a rule set per
+mode (wide gaps stays off for the Elizabeth line and the Overground), and buses on
+demand. See "Version 0.2.0" at the end of this file.
 
 ## Components
 
 ```
 apps/web         React app. Fetches /api/snapshot, validates it, renders.
 apps/worker      Worker: fetch handler (/api/*, static assets), scheduled
-                 handler (cron), Durable Object (refresh and summary store).
-packages/engine  Pure: summarise(predictions) and evaluate(statuses,
-                 summaries, now). No I/O, no clock.
+                 handler (cron), Durable Object (refresh, summary store and
+                 the on demand bus checks).
+packages/engine  Pure: summarise(predictions), evaluate(statuses,
+                 summaries, now) and evaluateBus(check). Mode profiles in
+                 config.ts. No I/O, no clock.
 packages/shared  Zod schemas and types used by worker and web.
 ```
 
@@ -180,3 +183,68 @@ What this means, without overstating it:
   snapshot so the request path only reads it.
 - The Elizabeth line was not added. Its parse cost would fit, but its train spacing is
   too irregular for the wide gaps rule (see Scope).
+
+## Version 0.2.0: more modes and buses
+
+### Modes
+
+`config.ts` holds one `ModeProfile` per mode: the lookahead, the thresholds, whether the
+feed carries usable vehicle ids, which rules are on, and the service window. The rules
+read the profile and the engine is one engine. The line ids are in `packages/shared`,
+with `modeOfLine` and a `mode` field on every verdict (defaulting to `tube`, so a
+snapshot stored before this still parses). `docs/RULES.md` has the profile per mode and
+the data behind each choice.
+
+### The refresh, in two phases
+
+The refresh now covers 19 lines, not 11. Its cost is parsing, set by feed size. Measured
+in Node (`docs/API-NOTES.md`), the Tube groups take about 30 ms and the other modes about
+30 ms (the Elizabeth line alone 10 ms for 1.3 MB). On Cloudflare the Tube groups were
+53 to 82 ms, about twice the Node figure, so one refresh of all 19 lines would be about
+110 to 160 ms. That is inside the Durable Object's documented 30 seconds, but it is
+double what ran live in 0.1.0, and it was not measured on Cloudflare.
+
+So the cron tick alternates between two sets of groups by minute parity: the Tube groups
+on one tick and five groups for the other modes on the next (`REFRESH_PHASES` in
+`apps/worker/src/tfl.ts`). Each tick then parses about what the Tube did alone in 0.1.0.
+Every line is refreshed at least every two minutes, inside the engine's four minute
+freshness limit. The Tube is now refreshed every two minutes, not every minute, which
+costs nothing real because TfL itself serves a response for up to 60 seconds. A cold
+start, with empty storage, refreshes every group at once. Summaries stored before the
+deploy still parse, so the Tube shows at once and the new lines read "not enough data"
+for at most two minutes.
+
+The status call grows from about 13 KB to about 23 KB, since it now asks for four modes.
+That is the part of the request path that changed, and it is still a single small call.
+
+### Buses, on demand
+
+```
+GET /api/bus/:route
+  Worker: validate the route with Zod (typed 400), then ask the Durable Object
+  Durable Object (everything heavy lives here):
+    route list   ids and names only, refreshed daily (348 KB, 675 routes)
+    not in list  typed 404 with no call to TfL
+    cached       reused for 45 seconds
+    in flight    concurrent checks of one route share one fetch
+    budget       120 TfL requests per rolling minute, then the cached result or a typed 429
+    fetch        status and arrivals together, parse, summarise, evaluateBus
+    store        last good result per route, at most 200 routes (least recently used out)
+    failure      the last good result marked stale, or a typed 503
+```
+
+The request budget: TfL allows 500 requests a minute for the key. The cron refresh makes
+10 a minute, a snapshot at most a few, and a bus check costs two (status and arrivals),
+so 120 a minute for buses is 60 route checks a minute and leaves the key far under its
+limit even if every search misses the cache. Searching many different routes cannot
+exceed it, and a route that is not in the stored list is refused without spending any.
+
+The arrivals payload for a busy route is about 350 to 390 KB and parses in 3 to 4 ms in
+Node, so it is parsed in the Durable Object and never in the request handler. The route
+list is parsed there too, once a day.
+
+### Not measured
+
+CPU for the new lines and for a bus check was measured in Node, not on Cloudflare. After
+a deploy, `wrangler tail` should be read for the refresh and for a bus check before any
+number is claimed.

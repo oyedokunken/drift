@@ -4,7 +4,55 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] (not yet released)
+
+### What changed in this release
+
+- The Elizabeth line, DLR and Overground (six named lines) are checked, with a mode
+  profile and a rule set per mode, and a mode switch in the page.
+- Bus routes are checked on demand when someone searches, at `GET /api/bus/:route` and
+  `?bus=207`, behind a cache, request coalescing and a request budget.
+- The no trains rule has a provisional service window per day type, with Sunday narrowed.
+- Per platform waits and the long waits and no trains rules, from the earlier review, are
+  part of this release (listed below).
+
+### Added in the modes and buses work
+
+- `ModeProfile` in the engine config: lookahead, thresholds, vehicle id handling, enabled
+  rules and service window per mode, with a reachability test for every profile.
+- Lines `elizabeth`, `dlr`, `liberty`, `lioness`, `mildmay`, `suffragette`, `weaver` and
+  `windrush`, a `mode` on every verdict, and the rule ids `not-measurable` and `no-buses`.
+- `evaluateBus` and `GET /api/bus/:route` with typed 400, 404, 429 and 503 answers.
+- A bus route list (ids and names, daily), a 45 second per route cache, a 200 route LRU
+  cap and a budget of 120 TfL requests a minute.
+- A mode switch, a bus search with a state for every outcome, and a non Tube mismatch in
+  `?sample=1`.
+- Fixtures for the Elizabeth line, DLR and Overground, and findings in `docs/API-NOTES.md`.
+
+### Changed in the modes and buses work
+
+- `vehicles15`, `vehicles30`, `inbound15` and `outbound15` can be null, for the DLR, where
+  `vehicleId` is blank and trains are not counted.
+- The service window is per day type: weekday 07:00 to 22:00, Saturday 08:00 to 21:30,
+  Sunday 09:00 to 19:30, London time, all provisional. The old single 07:00 to 22:00
+  window is gone.
+- The cron tick alternates between the Tube groups and the groups for the other modes.
+- Tests that had to change, and why: one shared test used `dlr` as an unknown line, five
+  worker tests used it the same way or assumed Tube only status, one refresh test counted
+  five groups, and two engine tests moved from a Sunday to a Monday 07:00 start because a
+  Sunday now opens at 09:00. The Tube verdict tests are unchanged.
+
+### Not done
+
+- Bus bunching detection. Cut for time, and a stop with a bus every few minutes can look
+  bunched while healthy.
+- Bus route suggestions and autocomplete. Exact route entry only.
+- A real disruption has never been seen firing any of the new rules.
+- CPU for the new modes and for bus checks was not measured on Cloudflare.
+- The weekend live checks fall after the 2026-11-13 handover, so the Sunday window is
+  unproven.
+
+### From the earlier review (per platform waits)
 
 ### Fixed
 

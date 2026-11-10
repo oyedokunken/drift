@@ -10,3 +10,4 @@ agent, which is why this log exists.
 | `01-kickoff.md`                           | The project brief and working rules           |
 | `02-cron-fan-out-decision.md`             | Approve the design that fits the free tier    |
 | `03-durable-object-and-continuous-run.md` | Approve the storage change and run to the end |
+| `04-more-modes-and-buses.md`              | Extend to more modes and on demand buses      |
