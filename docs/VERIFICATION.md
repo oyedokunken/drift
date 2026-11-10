@@ -126,13 +126,39 @@ What this shows:
 Recorded below as each runs, with the rule that fired (if any) and whether it was a real
 problem or a false alarm. Each run uses the same code as the branch and the real feed.
 
-| Label                     | London time                     | Status  |
-| ------------------------- | ------------------------------- | ------- |
-| Evening                   | about 19:00, Monday 2026-11-09  | pending |
-| Late evening              | about 23:00, Monday 2026-11-09  | pending |
-| Early morning             | about 05:30, Tuesday 2026-11-10 | pending |
-| Weekend, Saturday daytime | about 11:00, 2026-11-14         | pending |
-| Weekend, Sunday evening   | about 21:30, 2026-11-15         | pending |
+| Label                     | London time                     | Status                                       |
+| ------------------------- | ------------------------------- | -------------------------------------------- |
+| Evening                   | about 19:00, Monday 2026-11-09  | not run, the scheduled job never fired       |
+| Evening (replacement)     | 19:15, Tuesday 2026-11-10       | done, see below                              |
+| Late evening              | about 23:00, Monday 2026-11-09  | not run, the scheduled job never fired       |
+| Early morning             | about 05:30, Tuesday 2026-11-10 | not run, the scheduled job never fired       |
+| Weekend, Saturday daytime | about 11:00, 2026-11-14         | pending, falls after the 2026-11-13 handover |
+| Weekend, Sunday evening   | about 21:30, 2026-11-15         | pending, falls after the 2026-11-13 handover |
+
+The three Monday and Tuesday jobs were session only and did not run, so no result was
+invented for them.
+
+#### Evening, 19:15 London, Tuesday 2026-11-10
+
+| Line             | Official                       | Verdict | Rule                | Trains in 15 min | Platforms | Long waits | Median gap |
+| ---------------- | ------------------------------ | ------- | ------------------- | ---------------- | --------- | ---------- | ---------- |
+| Bakerloo         | Good Service                   | in step | in-step             | 25               | 49        | 0          | 5 min      |
+| Central          | Minor Delays                   | in step | in-step             | 59               | 95        | 0          | 4 min      |
+| Circle           | Good Service                   | in step | in-step             | 12               | 48        | 1          | 7 min      |
+| District         | Severe Delays and Minor Delays | unknown | partial-status      | 51               | 112       | 4          | 5 min      |
+| Hammersmith City | Good Service                   | in step | in-step             | 33               | 83        | 1          | 9 min      |
+| Jubilee          | Minor Delays                   | in step | in-step             | 37               | 55        | 0          | 3 min      |
+| Metropolitan     | Good Service                   | in step | in-step             | 36               | 70        | 2          | 4 min      |
+| Northern         | Minor Delays                   | in step | in-step             | 88               | 113       | 0          | 3 min      |
+| Piccadilly       | Good Service                   | in step | in-step             | 58               | 106       | 0          | 3 min      |
+| Victoria         | Severe Delays                  | unknown | delays-unverifiable | 25               | 30        | 0          | 2 min      |
+| Waterloo & City  | Good Service                   | in step | in-step             | 2                | 2         | 0          | 3 min      |
+
+No rule fired, so there is no real problem or false alarm to classify. This is the first
+snapshot with a real disruption: Victoria on Severe Delays and District on Severe and
+Minor Delays. Drift deliberately says "unknown" for delay statuses it cannot verify from
+arrivals, and it did, rather than guessing. Victoria still showed a 2 minute median gap,
+which is normal service, so the feed does not obviously contradict the status either way.
 
 ### CPU cost of the per platform summary
 
