@@ -32,22 +32,13 @@ mismatch has appeared in the hours Drift has been watched (see
 
 Version 0.2.0 extends Drift beyond the Tube.
 
-- **Elizabeth line, DLR and Overground** are checked every two minutes, with a rule set
-  per mode and a mode switch in the page. The headline counts drift across all of them.
-  Rules that cannot be trusted on a mode are off, and any line too infrequent to judge
-  from one snapshot says "not enough data" with low confidence. Details and the data
-  behind each choice are in [docs/RULES.md](docs/RULES.md).
-- **Bus routes** are checked when you search, not polled: type a route, or open
-  `?bus=207`. Each fetch runs in the Durable Object behind a 45 second cache, shared
-  concurrent requests and a budget of 120 TfL requests a minute, so a burst of searches
-  cannot push the key past TfL's limit.
-- **The no trains rule is safer on a Sunday.** Its service window is now per day type and
-  Sunday is narrow (09:00 to 19:30 London time), because the Sunday evening end is
-  unverified. Outside the window it says "not enough data", never a mismatch.
-- **Still not done:** no real disruption has been seen firing a new rule; the Cloudflare
-  CPU for the new lines and for bus checks is not measured; bus bunching and route
-  suggestions were cut; the weekend checks fall after this handover. See
-  [Not finished](#not-finished).
+- **Elizabeth line, DLR and Overground** are checked, with a rule set per mode and a mode
+  switch in the page. Rules that cannot be trusted on a mode are off, and a line too
+  infrequent to judge says "not enough data". See [docs/RULES.md](docs/RULES.md).
+- **Bus routes** are checked when you search (or open `?bus=207`), behind a cache and a
+  request budget that keeps the key under TfL's limit.
+- **The no trains rule is safer on a Sunday**, with a narrow provisional window.
+- **Not done or not proven:** see [Not finished](#not-finished).
 
 ## Why
 
@@ -140,6 +131,18 @@ rule only runs inside a provisional service window per day type (weekday 07:00 t
 provisional because the Sunday evening end is unverified, so Sunday is narrow on
 purpose; outside the window the answer is "unknown".
 
+### The new modes and bus search, live
+
+| Mode switch (Overground), 375px                         | Bus route search, 375px                              |
+| ------------------------------------------------------- | ---------------------------------------------------- |
+| ![Mode switch at 375px](docs/screenshots/modes-375.png) | ![Bus search at 375px](docs/screenshots/bus-375.png) |
+
+| Mode switch, 1280px                                       | Bus route search, 1280px                               |
+| --------------------------------------------------------- | ------------------------------------------------------ |
+| ![Mode switch at 1280px](docs/screenshots/modes-1280.png) | ![Bus search at 1280px](docs/screenshots/bus-1280.png) |
+
+These four are the real live site on 2026-11-10 after the 0.2.0 deploy.
+
 ## Run it locally
 
 Requires Node 22 and pnpm.
@@ -226,8 +229,11 @@ See [docs/VERIFICATION.md](docs/VERIFICATION.md) for the dated record. In short:
 - The outage behaviour was exercised against the real TfL API on a local Worker with
   real persisted storage: success, a stale fallback when TfL rejected the key, and a
   typed 503 with empty storage. The key appeared in no log or response.
-- Lighthouse on the deployed site, mobile profile, median of three runs:
-  **Performance 98, Accessibility 100, Best Practices 100, SEO 100** (after the 2026-11-08 redesign).
+- Lighthouse on the deployed site, mobile profile, median of three runs: **Performance
+  93, Accessibility 100, Best Practices 100, SEO 100** after the 0.2.0 deploy on 2026-11-10
+  (runs scored 93, 97 and 90, with total blocking time 130 to 340 ms). It was 98 for 0.1.0 on
+  2026-11-08. The runs are noisy, from a busy laptop, and I have not isolated whether the
+  drop is the extra mode and bus code or the machine.
 - No horizontal scroll at 320, 375, 768 or 1280 pixels.
 
 Size: the initial JavaScript is about 115 KB gzipped (React is 67 KB of that), with a
@@ -271,10 +277,23 @@ Said plainly, so nothing here is a surprise.
   21:30, Sunday 09:00 to 19:30 (London time). A timetable probe on 2026-11-09 was
   unreliable and no Sunday evening check has run, so Sunday is narrow on purpose. A wrong
   window costs a missed alarm, never a false one.
-- **Cloudflare CPU for the new lines and for bus checks is not measured.** The figures
-  in `docs/API-NOTES.md` are from Node, and Cloudflare ran about twice the Node figure for
-  the Tube. The refresh alternates two phases so each tick stays near what ran live in
-  0.1.0. Read `wrangler tail` after deploying.
+- **Bus checks used up to 16 ms of CPU against a documented 10 ms.** Measured with
+  `wrangler tail` after the deploy (a fetched route 4 to 16 ms). They run in the Durable
+  Object, whose documented limit is far higher, and nothing was stopped, but that is an
+  observation and not a guarantee. The refresh costs 63 to 103 ms a tick, about the same as
+  0.1.0 did for the Tube alone (75 ms).
+- **Right after the deploy every line read "not enough data" for about 70 seconds.** The
+  summaries stored by 0.1.0 lack a new field and are skipped until the next cron ticks, and
+  the cold start refresh has a 7 second cap that 19 lines can exceed (TfL timed out on some
+  parallel calls and was retried). It finished on its own and nothing broke, but a visitor
+  in that window saw an empty page. A deploy that changes the summary shape will do this
+  again.
+- **Only weekday evening bands have been checked live** (19:57 and 21:06 London time). No
+  late night, morning or weekend band has run, so the night routes and the Sunday windows
+  are unproven. Late night and morning checks are scheduled and will be recorded in
+  `docs/VERIFICATION.md`.
+- **Lighthouse performance is 93 against 98 for 0.1.0.** The three runs scored 93, 97 and
+  90, which is within the noise of a busy laptop, so the drop is not shown to be real.
 - **No real disruption has fired any new rule.** Overground lines were on Severe and
   Minor Delays and a Part Closure during the checks, which resolve to "unknown" by design.
 - **Wide gaps is off for the Elizabeth line and the Overground**, and the infrequent
@@ -330,6 +349,12 @@ data.
 - Web app and brand: about 1.5 hours
 - Redesign and outage fix: about 1 hour
 - Verification, docs and packaging: about 1.5 hours
+
+Second stage, about 4 hours (detection fixes about 1.9 hours, extension to more modes and
+buses about 2.1 hours): an estimate from git commit timestamps since the v0.1.0 tag,
+grouping commits into sessions with a break at any gap over 60 minutes and counting each
+session from 15 minutes before its first commit to its last. It includes time the agent
+ran while I reviewed, and the two buckets overlap by about 11 minutes.
 
 ## Phone check
 
