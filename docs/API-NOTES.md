@@ -1,16 +1,19 @@
 # TfL API notes
 
 Findings from calling the live TfL Unified API on 2026-11-08 (a Sunday, about
-09:00 London time) with a registered app key. Everything here was observed, not
-recalled. Re-check before relying on any number.
+09:00 London time) for the Tube, and on 2026-11-10 (a Tuesday, 19:00 to 21:00 London
+time) for the Elizabeth line, DLR, Overground and buses, with a registered app key.
+Everything here was observed, not recalled. Re-check before relying on any number.
 
 ## Endpoints used
 
-| Purpose          | Path                                            | Notes                                       |
-| ---------------- | ----------------------------------------------- | ------------------------------------------- |
-| Official status  | `GET /Line/Mode/tube,elizabeth-line,dlr/Status` | About 13 KB, parses in well under 1 ms.     |
-| Live predictions | `GET /Line/{id,id,...}/Arrivals`                | Comma separated line ids. Full, not capped. |
-| Severity codes   | `GET /Line/Meta/Severity`                       | Reference list, used to design the rules.   |
+| Purpose          | Path                                                       | Notes                                                                        |
+| ---------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Official status  | `GET /Line/Mode/tube,elizabeth-line,dlr,overground/Status` | About 23 KB, parses in well under 1 ms. Trams come back too and are ignored. |
+| Bus route list   | `GET /Line/Mode/bus`                                       | 348 KB, 675 routes. Read daily, ids and names kept.                          |
+| One bus route    | `GET /Line/{route}/Status` and `/Arrivals`                 | Fetched together, only when someone searches.                                |
+| Live predictions | `GET /Line/{id,id,...}/Arrivals`                           | Comma separated line ids. Full, not capped.                                  |
+| Severity codes   | `GET /Line/Meta/Severity`                                  | Reference list, used to design the rules.                                    |
 
 Authentication is `app_key` as a query string parameter. Because it travels in
 the URL, every log and error path must redact it.
@@ -103,8 +106,86 @@ See `docs/ARCHITECTURE.md` for the chosen response.
   small and capped (3 attempts per call), so a misconfigured key costs a bounded
   number of requests rather than a storm.
 
+## The other modes (2026-11-10)
+
+Mode listing: `GET /Line/Mode/elizabeth-line,dlr,overground,tram/Status`. The line ids,
+read from the response and not assumed:
+
+| Mode           | Line ids                                                             |
+| -------------- | -------------------------------------------------------------------- |
+| elizabeth-line | `elizabeth`                                                          |
+| dlr            | `dlr`                                                                |
+| overground     | `liberty`, `lioness`, `mildmay`, `suffragette`, `weaver`, `windrush` |
+| tram           | `tram` (not used)                                                    |
+
+Status shapes and severity codes are the same as the Tube's. Seen live that evening:
+Good Service (10), Minor Delays (9), Severe Delays (6) and Part Closure (5). Mildmay
+carried two statuses at once (Severe Delays and Minor Delays), as the District did.
+
+Arrivals, one call per line, at about 19:30 London time:
+
+| Line        | Rows | Size   | Vehicles | Platforms | `vehicleId` | Parse, Zod and summarise (Node) |
+| ----------- | ---- | ------ | -------- | --------- | ----------- | ------------------------------- |
+| elizabeth   | 1564 | 1.4 MB | 108      | 97        | present     | 10.1 ms                         |
+| dlr         | 271  | 231 KB | none     | 98        | **blank**   | 2.1 ms                          |
+| liberty     | 16   | 14 KB  | 8        | 3         | present     | 0.2 ms                          |
+| lioness     | 292  | 264 KB | 23       | 56        | present     | 2.2 ms                          |
+| mildmay     | 820  | 743 KB | 58       | 82        | present     | 6.2 ms                          |
+| suffragette | 30   | 27 KB  | 9        | 13        | present     | 0.2 ms                          |
+| weaver      | 374  | 338 KB | 40       | 77        | present     | 2.9 ms                          |
+| windrush    | 1002 | 904 KB | 87       | 74        | present     | 6.5 ms                          |
+
+The Node figures are wall time of the worker's own `fetchGroupPredictions` plus
+`summarise`, median of 14 runs on a busy Windows laptop. The Tube groups total about
+30 ms by the same method, and the platform reported 53 to 82 ms for them on Cloudflare
+(see `docs/ARCHITECTURE.md`), so Cloudflare ran about twice the Node figure. Nothing
+for the new lines was measured on Cloudflare.
+
+Things that differ from the Tube:
+
+- **DLR `vehicleId` is blank on every prediction**, so distinct trains cannot be counted.
+  The prediction `id` is shared by every row at a platform, and each row is one train,
+  with up to three per platform. Drift treats each prediction at a platform as a train,
+  told apart by when it is due.
+- **Lookahead is longer than the Tube's 30 minutes.** The largest `timeToStation` was
+  1758 s on the DLR and about 7160 s (two hours) on the Elizabeth line and the
+  Overground. Drift still reads 30 minutes ahead everywhere, which is its own choice.
+- **`direction` is empty on a share of rows**: 320 of 1564 on the Elizabeth line, 161 of
+  820 on Mildmay, 3 of 271 on the DLR.
+- **`platformName`** is `Platform N`, with `Platform Unknown` on some Mildmay rows.
+- The Elizabeth line took 4.5 seconds to download. The others took 0.3 to 2 seconds.
+
+## Buses (2026-11-10)
+
+- **Route list.** `GET /Line/Mode/bus` returned 348 KB for 675 routes in 3 seconds and
+  re-parses in about 2.5 ms in Node. Every id was one to four letters or digits (`1`,
+  `207`, `W11`, `N207`, `X26`). 64 were night routes starting with `N`. The `lineStatuses`
+  field in this listing is empty, so a route's status needs its own call.
+- **Status.** `GET /Line/207/Status` returns one line with one or more statuses. Seen:
+  Good Service (10) on routes 207, 490 and 73, and Special Service (0) on routes 18, W11
+  and N18. Bus status is thin: it was one of those two.
+- **Arrivals.** `GET /Line/207/Arrivals` returned 385 rows, 350 KB, 90 stops, 22
+  vehicles and a largest `timeToStation` of 1835 s, so the lookahead is about 30 minutes
+  as on the Tube. Route 18 returned 427 rows (390 KB), W11 46 to 53 (49 KB), 490 about
+  200 (186 KB). `vehicleId` is the registration (`YX17NVB`), `platformName` is the stop
+  letter and was the string `null` on some stops, `direction` is inbound or outbound.
+  A download took 0.2 to 3 seconds.
+- **Night route outside its hours.** `N207` returned `[]` (2 bytes) at 19:50 and
+  `Good Service`. An empty list is a valid answer, not an error.
+- **Unknown route.** `GET /Line/ZZZ/Arrivals` and `/Status` both returned HTTP 404 with a
+  JSON error body, and so did `207;drop`. Drift never sends either: the route is checked
+  against the stored list first.
+- **Per stop waits on ten healthy routes** (207, 18, 490, W11, 73, 25, 5, 36, H98, E1):
+  median wait 3.9 to 12.1 minutes, median gap 3.6 to 12.0. Stops waiting 20 minutes or
+  more: 0 on seven routes, 1 of 85 (490), 1 of 106 (36), 7 of 91 (18, 7.7 percent) and
+  5 of 26 (W11, 19 percent). That is where the bus long wait share came from.
+
 ## Fixtures
 
 Sanitised captures live in `packages/engine/fixtures/`. They contain no key
 (the key only ever appears in request URLs, never in bodies) and were checked
-for it before being committed.
+for it before being committed. `predictions-2026-11-10-evening-other-modes.json` and
+`status-2026-11-10-evening-other-modes.json` hold the Elizabeth line, DLR and Overground
+at 19:28 London time on a Tuesday, reduced to the fields Drift uses and to the 30 minute
+lookahead. The DLR rows keep their blank vehicle ids. Mildmay is on Severe and Minor
+Delays and Suffragette on Part Closure in that capture, which was a real disruption.
