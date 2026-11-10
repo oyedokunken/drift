@@ -440,12 +440,18 @@ describe('rule 5: no trains while good', () => {
   });
 
   it('reads service hours in London time, so summer shifts the window', () => {
-    expect(emptyCentral(new Date('2026-07-05T06:30:00Z')).outcome).toBe('mismatch');
-    expect(emptyCentral(new Date('2026-07-05T05:59:00Z')).outcome).toBe('unknown');
+    expect(emptyCentral(new Date('2026-07-06T06:30:00Z')).outcome).toBe('mismatch');
+    expect(emptyCentral(new Date('2026-07-06T05:59:00Z')).outcome).toBe('unknown');
   });
 
-  it('is a mismatch at the very start of service hours', () => {
-    expect(emptyCentral(new Date('2026-11-08T07:00:00Z')).ruleId).toBe('no-trains');
+  it('stays unknown on a Sunday evening and early Sunday morning, the provisional window', () => {
+    expect(emptyCentral(new Date('2026-11-08T19:30:00Z')).outcome).toBe('unknown');
+    expect(emptyCentral(new Date('2026-11-08T08:59:00Z')).outcome).toBe('unknown');
+    expect(emptyCentral(new Date('2026-11-08T19:29:00Z')).outcome).toBe('mismatch');
+  });
+
+  it('is a mismatch at the very start of weekday service hours', () => {
+    expect(emptyCentral(new Date('2026-11-09T07:00:00Z')).ruleId).toBe('no-trains');
   });
 
   it.each([

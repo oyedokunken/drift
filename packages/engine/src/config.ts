@@ -73,13 +73,34 @@ export const MIN_PLATFORMS_MEASURED = 5;
 /** Below this many measured platforms the wait and gap verdicts have low confidence. */
 export const SMALL_SAMPLE_PLATFORMS = 10;
 
+/** The three kinds of day the service window differs by, read in London local time. */
+export type DayType = 'weekday' | 'saturday' | 'sunday';
+
+/** A service window in London local time, as minutes after midnight: [start, end). */
+export interface ServiceWindow {
+  readonly startMin: number;
+  readonly endMin: number;
+}
+
 /**
- * Service hours inside which every Tube line is expected to run, in London local
- * time, as minutes after midnight. Deliberately narrower than the published first and
- * last trains so that the start and end of service never raise an alarm.
+ * Hours inside which every line is expected to be running, per day type. All three are
+ * provisional and deliberately narrower than the published first and last trains, so
+ * the start and end of service never raise an alarm. Outside a window the zero trains
+ * rule resolves to unknown, never to a mismatch.
+ *
+ * - weekday: the 2026-11-09 timetable probe showed Monday to Friday last departures at
+ *   about 00:13 to 00:56, so 07:00 to 22:00 leaves hours of margin each side.
+ * - saturday: the same probe showed late departures like a weekday, but Saturday
+ *   starts later, so the window opens at 08:00 and closes at 21:30.
+ * - sunday: the same probe showed Sunday last trains between 20:30 and 21:00 at the
+ *   sampled stations, and the data is unreliable. Until a Sunday evening live check
+ *   proves otherwise the window opens late (09:00) and closes early (19:30).
  */
-export const OPERATING_START_MIN = 7 * 60;
-export const OPERATING_END_MIN = 22 * 60;
+export const SERVICE_WINDOWS: Readonly<Record<DayType, ServiceWindow>> = {
+  weekday: { startMin: 7 * 60, endMin: 22 * 60 },
+  saturday: { startMin: 8 * 60, endMin: 21 * 60 + 30 },
+  sunday: { startMin: 9 * 60, endMin: 19 * 60 + 30 },
+};
 
 /** Time zone the operating hours are read in, so daylight saving needs no handling. */
 export const OPERATING_TIME_ZONE = 'Europe/London';

@@ -178,13 +178,28 @@ what an outage or a service gap looks like:
 
 - the line's summary is fresh and its feed held zero predictions (not merely none
   tied to a train),
-- the time is inside service hours, 07:00 to 22:00 London time (narrower than the
-  published first and last trains on purpose),
+- the time is inside the provisional service window for its London day type (see
+  below), which is narrower than the published first and last trains on purpose,
 - at least 4 other lines have 3 or more trains due within 15 minutes,
 - the network wide quiet guard is not tripped, and
 - fewer than 2 lines have an empty feed at once. The worker fetches lines in groups,
   so one empty response would empty several lines together, and two empty lines is
   treated as a feed fault.
+
+Service windows, read in Europe/London so daylight saving needs no handling:
+
+| Day type | Window         | Why                                                             |
+| -------- | -------------- | --------------------------------------------------------------- |
+| Weekday  | 07:00 to 22:00 | Last departures run to about 00:13 to 00:56, so there is margin |
+| Saturday | 08:00 to 21:30 | Starts later than a weekday, ends a little early                |
+| Sunday   | 09:00 to 19:30 | The timetable probe showed Sunday last trains at 20:30 to 21:00 |
+
+All three are **provisional**. The timetable probe (2026-11-09) was unreliable and no
+Sunday evening live check has run yet, so the Sunday window opens late and closes
+early on purpose. Outside the window the rule is `unknown`, never `mismatch`. A wrong
+window can therefore cost a missed alarm but not a false one. The windows are in
+`SERVICE_WINDOWS` in `config.ts` and are tested at both edges, at midnight and on both
+clock change dates.
 
 Confidence is always medium: one snapshot cannot rule out a short feed gap.
 Anything else stays `unknown` with rule `no-arrivals`. Overnight, Service Closed,

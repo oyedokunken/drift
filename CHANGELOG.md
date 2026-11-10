@@ -17,7 +17,7 @@ All notable changes to this project are documented here. The format follows
   the new long waits rule flags a line when 30 percent or more of its platforms wait 20
   minutes or longer.
 - A Good Service line with no trains at all is now a mismatch (no trains) instead of
-  unknown, only when its feed is fresh and empty, it is 07:00 to 22:00 London time, the
+  unknown, only when its feed is fresh and empty, it is inside the service window, the
   rest of the network is running and fewer than 2 lines are empty at once. Overnight,
   closed, planned and feed fault cases stay unknown.
 

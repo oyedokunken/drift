@@ -30,9 +30,21 @@ describe('engine thresholds', () => {
     expect(config.LONG_WAIT_HIGH_SHARE).toBeLessThanOrEqual(1);
   });
 
-  it('keeps the operating hours inside one day and in order', () => {
-    expect(config.OPERATING_START_MIN).toBeLessThan(config.OPERATING_END_MIN);
-    expect(config.OPERATING_END_MIN).toBeLessThanOrEqual(24 * 60);
+  it('keeps every service window inside one day and in order', () => {
+    for (const window of Object.values(config.SERVICE_WINDOWS)) {
+      expect(window.startMin).toBeLessThan(window.endMin);
+      expect(window.startMin).toBeGreaterThanOrEqual(0);
+      expect(window.endMin).toBeLessThanOrEqual(24 * 60);
+    }
+  });
+
+  it('never opens the Sunday window earlier, or closes it later, than the weekday one', () => {
+    const { weekday, saturday, sunday } = config.SERVICE_WINDOWS;
+    expect(sunday.startMin).toBeGreaterThanOrEqual(saturday.startMin);
+    expect(saturday.startMin).toBeGreaterThanOrEqual(weekday.startMin);
+    expect(sunday.endMin).toBeLessThanOrEqual(saturday.endMin);
+    expect(saturday.endMin).toBeLessThanOrEqual(weekday.endMin);
+    expect(sunday.endMin).toBeLessThanOrEqual(19 * 60 + 30);
   });
 
   it('keeps the per line quiet floor at or below the general floor', () => {

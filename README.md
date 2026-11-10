@@ -102,7 +102,11 @@ the history is in the [changelog](CHANGELOG.md).
 
 Partial closures, planned works, Severe Delays and missing data never produce a
 mismatch. They resolve to "unknown". A network wide quiet guard stops a feed fault or
-the end of service hours from looking like every line failing at once.
+the end of service hours from looking like every line failing at once. The no trains
+rule only runs inside a provisional service window per day type (weekday 07:00 to
+22:00, Saturday 08:00 to 21:30, Sunday 09:00 to 19:30, London time). They are
+provisional because the Sunday evening end is unverified, so Sunday is narrow on
+purpose; outside the window the answer is "unknown".
 
 ## Run it locally
 

@@ -195,6 +195,7 @@ describe('end to end, from raw predictions to a verdict', () => {
       ['overnight', '2026-11-08T02:00:00Z'],
       ['before the first trains', '2026-11-08T05:30:00Z'],
       ['after the last trains', '2026-11-08T23:30:00Z'],
+      ['Sunday evening, after the provisional window', '2026-11-08T19:30:00Z'],
     ])('stays unknown %s', (_name, at) => {
       expect(empty(new Date(at))).toMatchObject({
         outcome: 'unknown',
