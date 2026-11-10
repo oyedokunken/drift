@@ -7,6 +7,7 @@ import {
 } from '@drift/shared';
 import type { Env } from './env.ts';
 import { refreshSummaries, type RefreshReport } from './refresh.ts';
+import { LINE_GROUPS, REFRESH_PHASES } from './tfl.ts';
 import { productionRuntime } from './runtime.ts';
 import type { Store } from './store.ts';
 
@@ -48,18 +49,26 @@ export class DriftStore extends DurableObject<Env> implements Store {
   private inflight: Promise<RefreshReport> | null = null;
 
   /**
-   * Called by the cron trigger every minute and by the request path on a cold start.
-   * Callers that arrive while a refresh runs share it, so a burst of visitors on an
-   * empty store costs one round of TfL fetches.
+   * Called by the cron trigger every minute with a phase, which picks the groups of
+   * lines to refresh, and by the request path on a cold start with none, which refreshes
+   * every group. Callers that arrive while a refresh runs share it, so a burst of
+   * visitors on an empty store costs one round of TfL fetches.
    */
-  refresh(): Promise<RefreshReport> {
+  refresh(phase?: number): Promise<RefreshReport> {
     const { log, upstream } = productionRuntime(this.env);
-    this.inflight ??= refreshSummaries({
-      upstream,
-      store: this,
-      log,
-      now: () => new Date(),
-    }).finally(() => {
+    const groups =
+      phase === undefined
+        ? LINE_GROUPS
+        : (REFRESH_PHASES[phase % REFRESH_PHASES.length] ?? LINE_GROUPS);
+    this.inflight ??= refreshSummaries(
+      {
+        upstream,
+        store: this,
+        log,
+        now: () => new Date(),
+      },
+      groups,
+    ).finally(() => {
       this.inflight = null;
     });
     return this.inflight;

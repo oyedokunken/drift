@@ -9,6 +9,7 @@ import {
   upstreamOptions,
 } from '../test/helpers.ts';
 import { refreshSummaries } from './refresh.ts';
+import { LINE_GROUPS, REFRESH_PHASES } from './tfl.ts';
 
 const NOW = new Date('2026-11-08T09:00:00Z');
 
@@ -35,7 +36,7 @@ describe('refreshSummaries', () => {
     const { deps, store, calls } = setup((url) => json(arrivalsFor(url)));
     const report = await refreshSummaries(deps);
 
-    expect(calls).toHaveLength(5);
+    expect(calls).toHaveLength(LINE_GROUPS.length);
     expect([...store.summaries.keys()].sort()).toEqual([...LINE_IDS].sort());
     expect(report.failed).toEqual([]);
     expect(report.refreshed).toHaveLength(LINE_IDS.length);
@@ -102,6 +103,18 @@ describe('refreshSummaries', () => {
   it('logs failures with the reason', async () => {
     const { deps, lines } = setup(() => new Response('down', { status: 500 }));
     await refreshSummaries(deps);
-    expect(lines.filter((l) => l.includes('group_refresh_failed'))).toHaveLength(5);
+    expect(lines.filter((l) => l.includes('group_refresh_failed'))).toHaveLength(
+      LINE_GROUPS.length,
+    );
+  });
+
+  it('refreshes only the lines of the groups it is given', async () => {
+    const { deps, store, calls } = setup((url) => json(arrivalsFor(url)));
+    const phase = REFRESH_PHASES[1] ?? [];
+    const report = await refreshSummaries(deps, phase);
+
+    expect(calls).toHaveLength(phase.length);
+    expect([...store.summaries.keys()].sort()).toEqual([...phase.flat()].sort());
+    expect(report.failed).toEqual([]);
   });
 });

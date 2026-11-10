@@ -42,7 +42,9 @@ export default {
     return getApp(env)(request);
   },
 
-  scheduled(_controller, env, ctx) {
-    ctx.waitUntil(storeStub(env).refresh());
+  scheduled(controller, env, ctx) {
+    // One phase per minute, alternating, so each tick parses only some of the lines.
+    const phase = Math.floor(controller.scheduledTime / 60_000) % 2;
+    ctx.waitUntil(storeStub(env).refresh(phase));
   },
 } satisfies ExportedHandler<Env>;

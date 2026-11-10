@@ -18,13 +18,16 @@ export interface RefreshReport {
 }
 
 /**
- * Fetch every group of lines in parallel, reduce each line to a summary and store
+ * Fetch the given groups of lines in parallel, reduce each line to a summary and store
  * them. A failing group leaves its lines' previous summaries in place, so they age
  * rather than disappear, and never blocks the other groups.
  */
-export async function refreshSummaries(deps: RefreshDeps): Promise<RefreshReport> {
+export async function refreshSummaries(
+  deps: RefreshDeps,
+  groups: readonly (readonly LineId[])[] = LINE_GROUPS,
+): Promise<RefreshReport> {
   const outcomes = await Promise.all(
-    LINE_GROUPS.map(async (lines) => {
+    groups.map(async (lines) => {
       try {
         const fetchedAt = deps.now();
         const { predictions } = await fetchGroupPredictions(
