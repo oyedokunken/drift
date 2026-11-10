@@ -260,6 +260,22 @@ this section still says "not run", it did not happen.
 
 Status of the bands: band 1 (evening) done, band 2 not run.
 
+### The Worker run locally with real storage (2026-11-10, 20:09 to 20:15 London)
+
+`wrangler dev` with real Durable Object storage and the live TfL API, no deploy:
+
+- `/api/bus/207` 200 in 5.5 s on the first call (it also fetched the route list), then
+  200 in 21 ms from the cache. `w11` was normalised to `W11`. `9999` answered 404
+  `route_not_found`. `<script>` and `12345` answered 400 `invalid_route` without echoing
+  the input. `/api/bus/207/x` answered 404, a POST 405. Headers: `no-store` and the CSP.
+- Both refresh phases ran: 8 lines for the other modes and 11 for the Tube. This run found
+  a real bug, a Tube tick joining a refresh of the other lines and never updating, fixed in
+  `refresh-runs.ts`.
+- `/api/snapshot` then held 19 verdicts: Tube 10 in step and 1 unknown (Victoria, Severe
+  Delays), DLR, Elizabeth line and Windrush in step, five Overground lines unknown.
+- On empty storage the 7 second cold start cap was too short for 19 lines (see the README).
+- The key appeared in no log line.
+
 ### Verified, and not
 
 - **Verified:** the new rules and profiles stay quiet on a healthy evening across all

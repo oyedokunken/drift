@@ -175,8 +175,8 @@ then renders the PNG, ICO and Open Graph files into `apps/web/public/`.
 
 ## Testing
 
-351 tests across 18 files, run on every push. Coverage overall is 96 percent of
-statements and 92 percent of branches, with thresholds enforced in CI (engine, shared
+729 tests across 30 files, run on every push. Coverage overall is 97.5 percent of
+statements and 94.5 percent of branches, with thresholds enforced in CI (engine, shared
 and Worker at 90 percent or more).
 
 - **Engine:** table driven cases with boundary values on both sides of every
@@ -188,7 +188,13 @@ and Worker at 90 percent or more).
   response.
 - **Web:** every state (loading, in step, mismatches, partial data, stale, offline,
   hard error with retry) with an automated accessibility check on each, plus a test
-  that computes WCAG contrast for the actual palette tokens.
+  that computes WCAG contrast for the actual palette tokens, the mode switch, and the
+  bus search in every state (idle, invalid, loading, result, not found, busy, trouble,
+  stale, a late answer, a hung request).
+- **Per mode and bus:** a reachability test for every mode profile, end to end tests per
+  mode and rule from raw predictions to a verdict, and Worker tests for the bus path
+  (validation, unknown route, large payload, cache, coalescing, budget, upstream failure
+  with and without a stale result, and the key never leaking).
 
 CI also runs typecheck, lint, format check, the build and a gitleaks secret scan.
 A local pre-commit hook runs lint and format on staged files.
