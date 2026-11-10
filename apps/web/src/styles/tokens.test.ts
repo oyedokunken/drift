@@ -72,6 +72,7 @@ const TEXT_PAIRS: readonly (readonly [string, string, string])[] = [
 /** Pairs that draw shapes. Graphical objects need 3:1 (WCAG 1.4.11). */
 const SHAPE_PAIRS: readonly (readonly [string, string, string])[] = [
   [token('grey-500'), token('wash'), 'dashed outline of an unknown line'],
+  [token('grey-500'), token('wash'), 'outline of a mode switch button on the page wash'],
   [token('blue-600'), token('white'), 'drift track fill and row edge on white'],
   [token('blue-600'), token('grey-200'), 'drift track fill against its rail'],
   [token('blue-900'), token('grey-200'), 'threshold tick against the rail'],

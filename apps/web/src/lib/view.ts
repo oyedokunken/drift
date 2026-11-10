@@ -1,5 +1,11 @@
 import { config } from '@drift/engine';
-import type { LineId, Observed, Verdict } from '@drift/shared';
+import {
+  MODE_IDS,
+  type LineId,
+  type ModeId,
+  type Observed,
+  type Verdict,
+} from '@drift/shared';
 
 interface LineNames {
   readonly name: string;
@@ -19,7 +25,35 @@ const LINES: Readonly<Record<LineId, LineNames>> = {
   piccadilly: { name: 'Piccadilly', code: 'PIC' },
   victoria: { name: 'Victoria', code: 'VIC' },
   'waterloo-city': { name: 'Waterloo and City', code: 'W&C' },
+  elizabeth: { name: 'Elizabeth line', code: 'ELI' },
+  dlr: { name: 'DLR', code: 'DLR' },
+  liberty: { name: 'Liberty', code: 'LIB' },
+  lioness: { name: 'Lioness', code: 'LIO' },
+  mildmay: { name: 'Mildmay', code: 'MIL' },
+  suffragette: { name: 'Suffragette', code: 'SUF' },
+  weaver: { name: 'Weaver', code: 'WEA' },
+  windrush: { name: 'Windrush', code: 'WIN' },
 };
+
+/** Mode names as a reader knows them. */
+export const MODE_LABELS: Readonly<Record<ModeId, string>> = {
+  tube: 'Tube',
+  'elizabeth-line': 'Elizabeth line',
+  dlr: 'DLR',
+  overground: 'Overground',
+};
+
+/** What the mode switch can show: every mode together, or one. */
+export type ModeFilter = ModeId | 'all';
+
+export const MODE_FILTERS: readonly ModeFilter[] = ['all', ...MODE_IDS];
+
+export function filterByMode(
+  verdicts: readonly Verdict[],
+  filter: ModeFilter,
+): Verdict[] {
+  return verdicts.filter((verdict) => filter === 'all' || verdict.mode === filter);
+}
 
 export function lineName(lineId: LineId): string {
   return LINES[lineId].name;
@@ -82,6 +116,7 @@ const RULE_TITLES: Readonly<Record<Verdict['ruleId'], string>> = {
   'delays-unverifiable': 'Delays cannot be checked',
   'no-arrivals': 'No live data',
   'network-quiet': 'Network wide quiet',
+  'not-measurable': 'Cannot be measured',
 };
 
 export function ruleTitle(ruleId: Verdict['ruleId']): string {
@@ -132,6 +167,14 @@ export function liveFigure(verdict: Verdict): LiveFigure | null {
     };
   }
   const { vehicles15 } = observed;
+  if (vehicles15 === null) {
+    // A mode with no vehicle ids has no train count, so show the gap it can measure.
+    if (observed.headwaySec === null) return null;
+    return {
+      value: Math.round(observed.headwaySec / 60),
+      label: 'minutes between trains',
+    };
+  }
   return {
     value: vehicles15,
     label: vehicles15 === 1 ? 'train due in 15 min' : 'trains due in 15 min',
@@ -161,8 +204,8 @@ const TRAINS_DOMAIN = config.FLOWING_HIGH_VEHICLES * 2;
 /** The axis runs to twice the wide gap threshold, past the "unambiguous" gap. */
 const MINUTES_DOMAIN = (config.WIDE_HEADWAY_SEC * 2) / 60;
 
-/** The axis runs to twice the long wait share threshold. */
-const PERCENT_DOMAIN = config.LONG_WAIT_PLATFORM_SHARE * 200;
+/** The axis runs to twice the long wait share threshold, and never past 100 percent. */
+const percentDomain = (share: number): number => Math.min(100, share * 200);
 
 /** Suspended, Closed and Not Running read as "should be stopped". */
 function isDown(verdict: Verdict): boolean {
@@ -198,13 +241,14 @@ export function trackReading(verdict: Verdict): TrackReading | null {
   const { observed } = verdict;
   if (observed === null || verdict.outcome === 'unknown') return null;
   if (verdict.ruleId === 'closed-hours') return null;
+  const profile = config.profileOf(verdict.lineId);
 
   if (verdict.ruleId === 'wide-gaps') {
     if (observed.headwaySec === null) return null;
     return {
       unit: 'minutes',
       value: Math.round(observed.headwaySec / 60),
-      threshold: config.WIDE_HEADWAY_SEC / 60,
+      threshold: profile.wideHeadwaySec / 60,
       domain: MINUTES_DOMAIN,
       limit: 'ceiling',
     };
@@ -214,12 +258,13 @@ export function trackReading(verdict: Verdict): TrackReading | null {
     return {
       unit: 'percent',
       value: longWaitPercent(observed),
-      threshold: config.LONG_WAIT_PLATFORM_SHARE * 100,
-      domain: PERCENT_DOMAIN,
+      threshold: profile.longWaitShare * 100,
+      domain: percentDomain(profile.longWaitShare),
       limit: 'ceiling',
     };
   }
 
+  if (observed.vehicles15 === null) return null;
   const reading = trainsReading(verdict, observed.vehicles15);
   const lopsided =
     verdict.outcome === 'mismatch' &&

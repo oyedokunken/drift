@@ -1,3 +1,4 @@
+import { LINE_IDS } from '@drift/shared';
 import { config } from '@drift/engine';
 import { describe, expect, it } from 'vitest';
 import {
@@ -13,6 +14,7 @@ import {
   countOutcomes,
   lineCode,
   lineName,
+  filterByMode,
   ruleTitle,
   sortVerdicts,
   liveFigure,
@@ -284,5 +286,57 @@ describe('track words and shares', () => {
     });
     const reading = trackReading(busy);
     expect(reading && trackShares(reading).fill).toBe(1);
+  });
+});
+
+describe('modes in the view', () => {
+  const noCounts = {
+    vehicles15: null,
+    vehicles30: null,
+    inbound15: null,
+    outbound15: null,
+    headwaySec: 300,
+    platformsMeasured: 40,
+    longWaitPlatforms: 0,
+  };
+
+  it('names every line and gives it a code', () => {
+    for (const lineId of LINE_IDS) {
+      expect(lineName(lineId)).not.toBe('');
+      expect(lineCode(lineId)).toHaveLength(3);
+    }
+    expect(lineName('elizabeth')).toBe('Elizabeth line');
+    expect(lineName('windrush')).toBe('Windrush');
+  });
+
+  it('filters verdicts by mode, and All keeps every one', () => {
+    const verdicts = [verdict('central'), verdict('dlr'), verdict('weaver')];
+    expect(filterByMode(verdicts, 'all')).toHaveLength(3);
+    expect(filterByMode(verdicts, 'overground').map((v) => v.lineId)).toEqual(['weaver']);
+    expect(filterByMode(verdicts, 'elizabeth-line')).toEqual([]);
+  });
+
+  it('shows the gap between trains when trains are not counted, and no track', () => {
+    const dlr = verdict('dlr', { observed: noCounts });
+    expect(liveFigure(dlr)).toEqual({ value: 5, label: 'minutes between trains' });
+    expect(trackReading(dlr)).toBeNull();
+  });
+
+  it('shows no figure when trains are not counted and there is no gap either', () => {
+    const dlr = verdict('dlr', { observed: { ...noCounts, headwaySec: null } });
+    expect(liveFigure(dlr)).toBeNull();
+  });
+
+  it('draws the long waits track against the mode own threshold', () => {
+    const base = longWaitsVerdict('elizabeth');
+    expect(trackReading(base)).toMatchObject({
+      unit: 'percent',
+      threshold: 40,
+      domain: 80,
+    });
+    expect(trackReading(longWaitsVerdict('central'))).toMatchObject({
+      threshold: 30,
+      domain: 60,
+    });
   });
 });

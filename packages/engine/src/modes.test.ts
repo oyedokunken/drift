@@ -10,7 +10,13 @@ import {
 } from '@drift/shared';
 import predictionFixture from '../fixtures/predictions-2026-11-10-evening-other-modes.json' with { type: 'json' };
 import statusFixture from '../fixtures/status-2026-11-10-evening-other-modes.json' with { type: 'json' };
-import { MODE_PROFILES, profileOf, rulesOf, type ModeProfile } from './config.ts';
+import {
+  LONG_WAIT_SEC,
+  MODE_PROFILES,
+  profileOf,
+  rulesOf,
+  type ModeProfile,
+} from './config.ts';
 import { evaluate } from './evaluate.ts';
 import { summarise } from './summarise.ts';
 
@@ -135,6 +141,12 @@ describe('mode profiles', () => {
         expect(window.endMin).toBeLessThanOrEqual(24 * 60);
       }
     });
+  });
+
+  it('uses one long wait length everywhere, because the interface prints it once', () => {
+    for (const profile of Object.values(MODE_PROFILES)) {
+      expect(profile.longWaitSec).toBe(LONG_WAIT_SEC);
+    }
   });
 
   it('keeps the Tube exactly as it was', () => {
