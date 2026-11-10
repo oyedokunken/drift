@@ -5,8 +5,11 @@ import {
   type ArrivalSummary,
   type Snapshot,
 } from '@drift/shared';
+import { createBusService, type BusOutcome } from './bus.ts';
 import type { Env } from './env.ts';
 import { refreshSummaries, type RefreshReport } from './refresh.ts';
+import { createRefreshRuns } from './refresh-runs.ts';
+import { LINE_GROUPS, REFRESH_PHASES } from './tfl.ts';
 import { productionRuntime } from './runtime.ts';
 import type { Store } from './store.ts';
 
@@ -26,13 +29,17 @@ export class DriftStore extends DurableObject<Env> implements Store {
     return Promise.resolve();
   }
 
-  loadSummaries(): Promise<ArrivalSummary[]> {
+  private readSummaries(): ArrivalSummary[] {
     const summaries: ArrivalSummary[] = [];
     for (const [, value] of this.ctx.storage.kv.list({ prefix: SUMMARY_PREFIX })) {
       const parsed = arrivalSummarySchema.safeParse(value);
       if (parsed.success) summaries.push(parsed.data);
     }
-    return Promise.resolve(summaries);
+    return summaries;
+  }
+
+  loadSummaries(): Promise<ArrivalSummary[]> {
+    return Promise.resolve(this.readSummaries());
   }
 
   saveSnapshot(snapshot: Snapshot): Promise<void> {
@@ -45,23 +52,47 @@ export class DriftStore extends DurableObject<Env> implements Store {
     return Promise.resolve(parsed.success ? parsed.data : null);
   }
 
-  private inflight: Promise<RefreshReport> | null = null;
+  private runs: ((phase?: number) => Promise<RefreshReport>) | undefined;
+
+  private busService: ReturnType<typeof createBusService> | undefined;
 
   /**
-   * Called by the cron trigger every minute and by the request path on a cold start.
-   * Callers that arrive while a refresh runs share it, so a burst of visitors on an
-   * empty store costs one round of TfL fetches.
+   * Checks one bus route. Everything heavy happens here: the route list, the large
+   * arrivals payload, the cache, coalescing and the request budget all live in this
+   * object, so the request handler only validates the route and relays the answer.
    */
-  refresh(): Promise<RefreshReport> {
-    const { log, upstream } = productionRuntime(this.env);
-    this.inflight ??= refreshSummaries({
-      upstream,
-      store: this,
-      log,
-      now: () => new Date(),
-    }).finally(() => {
-      this.inflight = null;
-    });
-    return this.inflight;
+  checkBus(route: string): Promise<BusOutcome> {
+    this.busService ??= (() => {
+      const { log, upstream } = productionRuntime(this.env);
+      return createBusService({
+        upstream,
+        log,
+        now: () => new Date(),
+        kv: this.ctx.storage.kv,
+        summaries: () => this.readSummaries(),
+      });
+    })();
+    return this.busService.check(route);
+  }
+
+  /**
+   * Called by the cron trigger every minute with a phase, which picks the groups of
+   * lines to refresh, and by the request path on a cold start with none, which refreshes
+   * every group. Callers that arrive while a refresh runs share it, so a burst of
+   * visitors on an empty store costs one round of TfL fetches.
+   */
+  refresh(phase?: number): Promise<RefreshReport> {
+    this.runs ??= createRefreshRuns((selected) => {
+      const { log, upstream } = productionRuntime(this.env);
+      const groups =
+        selected === undefined
+          ? LINE_GROUPS
+          : (REFRESH_PHASES[selected % REFRESH_PHASES.length] ?? LINE_GROUPS);
+      return refreshSummaries(
+        { upstream, store: this, log, now: () => new Date() },
+        groups,
+      );
+    }, REFRESH_PHASES.length);
+    return this.runs(phase);
   }
 }

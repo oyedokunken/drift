@@ -54,7 +54,7 @@ describe('predictionSchema', () => {
   });
 
   it.each([
-    ['unknown line', { lineId: 'dlr' }],
+    ['unknown line', { lineId: 'tram' }],
     ['non numeric time', { timeToStation: '120' }],
     ['fractional time', { timeToStation: 1.5 }],
     ['bad direction', { direction: 'sideways' }],

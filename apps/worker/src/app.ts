@@ -1,4 +1,5 @@
-import type { ApiError } from '@drift/shared';
+import { busRouteSchema, type ApiError } from '@drift/shared';
+import type { BusOutcome } from './bus.ts';
 import { CACHE, secured } from './headers.ts';
 import type { SnapshotResult } from './snapshot.ts';
 
@@ -11,6 +12,8 @@ export interface CacheLike {
 export interface AppDeps {
   readonly now: () => Date;
   readonly snapshot: { get(): Promise<SnapshotResult> };
+  /** Checks one validated bus route. The work happens in the Durable Object. */
+  readonly bus: (route: string) => Promise<BusOutcome>;
   readonly cache: CacheLike;
   /** Serves the built web app. */
   readonly assets: (request: Request) => Promise<Response>;
@@ -86,6 +89,55 @@ async function snapshotResponse(request: Request, deps: AppDeps): Promise<Respon
   return withServerTime(secured(response, cacheControl), deps);
 }
 
+/** The raw path segment, decoded. A malformed escape is returned as it is and then rejected. */
+function decodeSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+}
+
+const BUS_PATH = /^\/api\/bus\/([^/]*)$/;
+
+/**
+ * One bus route. The route is validated before anything else happens, and no message
+ * repeats what the visitor sent, so nothing they type is reflected in a response.
+ */
+async function busResponse(segment: string, deps: AppDeps): Promise<Response> {
+  const route = busRouteSchema.safeParse(decodeSegment(segment));
+  if (!route.success) {
+    return apiError(
+      'invalid_route',
+      'A bus route is one to four letters or digits, like 207 or W11.',
+      400,
+    );
+  }
+
+  const outcome = await deps.bus(route.data);
+  switch (outcome.kind) {
+    case 'ok':
+      return withServerTime(secured(json(outcome.result), CACHE.none), deps);
+    case 'not_found':
+      return apiError('route_not_found', 'TfL has no bus route with that number.', 404);
+    case 'busy': {
+      const response = apiError(
+        'busy',
+        'Too many bus checks just now. Please try again in a moment.',
+        429,
+      );
+      response.headers.set('Retry-After', String(outcome.retryAfterSeconds));
+      return response;
+    }
+    case 'unavailable':
+      return apiError(
+        'upstream_unavailable',
+        'Bus data is temporarily unavailable and there is no earlier result for this route.',
+        503,
+      );
+  }
+}
+
 async function assetResponse(request: Request, deps: AppDeps): Promise<Response> {
   const response = await deps.assets(request);
   const { pathname } = new URL(request.url);
@@ -95,19 +147,21 @@ async function assetResponse(request: Request, deps: AppDeps): Promise<Response>
   return secured(response, isHtml ? CACHE.revalidate : CACHE.daily);
 }
 
-/** Route a request: the two API routes, a typed error for any other API path, else the app. */
+/** Route a request: the API routes, a typed error for any other API path, else the app. */
 export function createApp(deps: AppDeps): (request: Request) => Promise<Response> {
   return async (request) => {
     const { pathname } = new URL(request.url);
 
     if (!pathname.startsWith('/api/')) return assetResponse(request, deps);
 
-    if (pathname !== '/api/snapshot' && pathname !== '/api/health') {
+    const bus = BUS_PATH.exec(pathname);
+    if (pathname !== '/api/snapshot' && pathname !== '/api/health' && bus === null) {
       return apiError('not_found', 'No such API route.', 404);
     }
     if (request.method !== 'GET') {
       return apiError('method_not_allowed', 'Only GET is supported.', 405);
     }
+    if (bus !== null) return busResponse(bus[1] ?? '', deps);
     if (pathname === '/api/health') return secured(json({ ok: true }), CACHE.none);
 
     return snapshotResponse(request, deps);

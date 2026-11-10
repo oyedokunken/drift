@@ -20,6 +20,9 @@ export const ERROR_CODES = [
   'upstream_unavailable',
   'not_found',
   'method_not_allowed',
+  'invalid_route',
+  'route_not_found',
+  'busy',
 ] as const;
 
 /** Typed body for every non 2xx API response. Never a bare 500. */

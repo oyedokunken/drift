@@ -178,13 +178,28 @@ what an outage or a service gap looks like:
 
 - the line's summary is fresh and its feed held zero predictions (not merely none
   tied to a train),
-- the time is inside service hours, 07:00 to 22:00 London time (narrower than the
-  published first and last trains on purpose),
+- the time is inside the provisional service window for its London day type (see
+  below), which is narrower than the published first and last trains on purpose,
 - at least 4 other lines have 3 or more trains due within 15 minutes,
 - the network wide quiet guard is not tripped, and
 - fewer than 2 lines have an empty feed at once. The worker fetches lines in groups,
   so one empty response would empty several lines together, and two empty lines is
   treated as a feed fault.
+
+Service windows, read in Europe/London so daylight saving needs no handling:
+
+| Day type | Window         | Why                                                             |
+| -------- | -------------- | --------------------------------------------------------------- |
+| Weekday  | 07:00 to 22:00 | Last departures run to about 00:13 to 00:56, so there is margin |
+| Saturday | 08:00 to 21:30 | Starts later than a weekday, ends a little early                |
+| Sunday   | 09:00 to 19:30 | The timetable probe showed Sunday last trains at 20:30 to 21:00 |
+
+All three are **provisional**. The timetable probe (2026-11-09) was unreliable and no
+Sunday evening live check has run yet, so the Sunday window opens late and closes
+early on purpose. Outside the window the rule is `unknown`, never `mismatch`. A wrong
+window can therefore cost a missed alarm but not a false one. The windows are in
+`SERVICE_WINDOWS` in `config.ts` and are tested at both edges, at midnight and on both
+clock change dates.
 
 Confidence is always medium: one snapshot cannot rule out a short feed gap.
 Anything else stays `unknown` with rule `no-arrivals`. Overnight, Service Closed,
@@ -211,6 +226,87 @@ A baseline per platform and time bucket is the next piece of work and is not bui
 
 `match`, with confidence high unless a metric sits within 25 percent of its
 threshold, or fewer than 5 platforms were measured, then medium.
+
+## Rules by mode
+
+The rules read a profile per mode (`MODE_PROFILES` in `config.ts`), so a mode is a new
+entry and the engine is not forked. A rule that is off for a mode can never fire there.
+Every profile has a test that fails if a time threshold it uses cannot be reached inside
+its lookahead, the bug that once broke wide gaps.
+
+| Mode           | Vehicle rules                        | Wide gaps | Long waits                       | No trains | All rules in the service window       |
+| -------------- | ------------------------------------ | --------- | -------------------------------- | --------- | ------------------------------------- |
+| Tube           | on                                   | on        | on (30%)                         | on        | no, the network quiet guard does that |
+| Elizabeth line | on                                   | **off**   | on (40%)                         | on        | yes                                   |
+| DLR            | **off**                              | on        | on (30%)                         | on        | yes                                   |
+| Overground     | **off**, except Mildmay and Windrush | **off**   | on for Mildmay and Windrush only | on        | yes                                   |
+
+Vehicle rules are quiet while good, one sided service, flowing while suspended and
+closed hours. They count distinct vehicles.
+
+- **Elizabeth line.** Wide gaps is off. The first look at its feed, on the Sunday
+  morning of 2026-11-08, gave a median gap of 12.7 minutes with a 30 minute spread, close
+  to the 15 minute bar. On 2026-11-10 at 19:30 the median was 5.9 with a 90th percentile
+  of 12.6 and 7 of 94 platforms at 15 minutes or more. Branches run at different
+  frequencies, so a median over the whole line is not a safe alarm. Long waits stays on
+  at 40 percent rather than 30, because 3 of 94 platforms waited 20 minutes on a healthy
+  evening and a two trains an hour branch can wait that long legitimately.
+- **DLR.** `vehicleId` is blank, so trains are not counted and the vehicle rules are off.
+  Each prediction at a platform is a train. Median wait 3.2 minutes, median gap 5.0,
+  90th percentile gap 11.0, 1 of 98 platforms waiting 20 minutes: well inside the Tube's
+  thresholds, which are kept. A Suspended or Closed status resolves to unknown
+  (`not-measurable`) because it cannot be checked without counting trains.
+- **Overground.** Six lines, judged separately. Weaver sat at a median gap of exactly
+  15.0 minutes and Lioness at 13.0 on Good Service, so wide gaps is off for the whole
+  mode, as it would raise a false alarm on a healthy line. Liberty (3 platforms),
+  Lioness, Suffragette and Weaver run a train every 15 to 30 minutes, so none can be
+  judged by counting trains or waits in one snapshot. They keep only no trains, and
+  otherwise resolve to **unknown, low confidence** with the rule `not-measurable`.
+  Mildmay (58 vehicles) and Windrush (87) are frequent, so they keep the vehicle rules
+  and long waits.
+
+Outside the service window the Elizabeth line, DLR, Overground and buses resolve to
+unknown, whatever the rule. The Tube is unchanged: it relies on the network wide quiet
+guard, which was proven on Tube data.
+
+The rule id `not-measurable` means Drift has no trustworthy way to judge the line or
+status, so it makes no comparison. It is always unknown with low confidence.
+
+## Bus routes
+
+Buses are checked one route at a time when a visitor searches, never polled. The verdict
+comes from `evaluateBus`, which reads the route's status, one reading of its predictions,
+and when the route last had buses, and uses the same per stop measures as the Tube. A
+route is judged only if it has 15 stops with a bus due. Everything doubtful is
+**unknown, low confidence**.
+
+TfL's bus status is thin: Good Service or Special Service was all that was seen, and
+Special Service is a partial status, so it resolves to unknown like any other.
+
+Two rules can fire.
+
+**No buses (`no-buses`).** Official: Good Service. Observed: no bus predicted on the
+route. It fires, with medium confidence, only when **all** of these hold:
+
+- the time is inside the weekday, Saturday or Sunday service window,
+- the route is not a night route (`N` then a digit),
+- the rest of the feed is healthy: at least 4 other lines running, the network not quiet
+  and fewer than 2 lines empty,
+- the route had buses predicted within the last 90 minutes. A route that has not been
+  seen running cannot be told from one that is not running today, and the first search of
+  a route has no earlier reading, so it resolves to unknown.
+
+**Long waits (`long-waits`)**, as for the Tube but per stop. Fires when at least 40
+percent of the route's stops wait 20 minutes or more, with at least 15 stops sampled and
+only on a frequent route, one whose median gap between buses is 12 minutes or less. On a
+route with a bus every 20 minutes a 20 minute wait is normal, so such routes are
+unknown. Confidence is low under 30 stops, high from 60 percent of stops, else medium.
+The 40 percent is twice the worst healthy near miss: 7.7 percent on route 18 and 19
+percent on W11, a short route.
+
+Night routes, thin samples (fewer than 15 stops), infrequent routes, statuses other than
+running, and anything outside the service window are unknown. Wide gaps is off for
+buses because routes bunch, and buses are not counted, so no vehicle rule applies.
 
 ## Where the numbers live
 

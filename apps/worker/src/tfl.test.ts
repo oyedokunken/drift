@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LINE_IDS } from '@drift/shared';
+import { LINE_IDS, TUBE_LINE_IDS } from '@drift/shared';
 import statusFixture from '../../../packages/engine/fixtures/status-2026-11-08-sunday-morning.json' with { type: 'json' };
 import {
   KEY,
@@ -11,7 +11,12 @@ import {
   tflPrediction,
   upstreamOptions,
 } from '../test/helpers.ts';
-import { LINE_GROUPS, fetchGroupPredictions, fetchStatuses } from './tfl.ts';
+import {
+  LINE_GROUPS,
+  REFRESH_PHASES,
+  fetchGroupPredictions,
+  fetchStatuses,
+} from './tfl.ts';
 import { UpstreamError } from './upstream.ts';
 
 function options(body: unknown) {
@@ -21,10 +26,12 @@ function options(body: unknown) {
 }
 
 describe('fetchStatuses', () => {
-  it('reads the real captured status response and keeps only Tube lines', async () => {
+  it('reads the real captured status response: the Tube lines plus DLR and the Elizabeth line', async () => {
     const { upstream } = options(statusFixture);
     const statuses = await fetchStatuses(upstream);
-    expect(statuses.map((s) => s.lineId).sort()).toEqual([...LINE_IDS].sort());
+    expect(statuses.map((s) => s.lineId).sort()).toEqual(
+      [...TUBE_LINE_IDS, 'dlr', 'elizabeth'].sort(),
+    );
   });
 
   it('keeps every status when a line has several', async () => {
@@ -36,19 +43,21 @@ describe('fetchStatuses', () => {
     ]);
   });
 
-  it('asks TfL for the tube status', async () => {
+  it('asks TfL for the status of every mode in one call', async () => {
     const { upstream, calls } = options(statusBody(['central']));
     await fetchStatuses(upstream);
-    expect(calls[0]?.pathname).toBe('/Line/Mode/tube/Status');
+    expect(calls[0]?.pathname).toBe(
+      '/Line/Mode/tube,elizabeth-line,dlr,overground/Status',
+    );
   });
 
   it('ignores lines Drift does not evaluate and extra fields', async () => {
     const { upstream } = options([
-      ...statusBody(['central', 'dlr', 'elizabeth']),
+      ...statusBody(['central', 'tram', 'elizabeth']),
       { unrelated: 1 },
     ]);
     const statuses = await fetchStatuses(upstream);
-    expect(statuses.map((s) => s.lineId)).toEqual(['central']);
+    expect(statuses.map((s) => s.lineId)).toEqual(['central', 'elizabeth']);
   });
 
   it('drops a malformed line but keeps the rest', async () => {
@@ -61,7 +70,7 @@ describe('fetchStatuses', () => {
     ['an object instead of a list', { lines: [] }],
     ['an empty list', []],
     ['only unreadable lines', [{ id: 'central' }, { id: 'victoria', lineStatuses: [] }]],
-    ['only unknown lines', statusBody(['dlr'])],
+    ['only unknown lines', statusBody(['tram'])],
     ['null', null],
   ])('fails with a parse error for %s', async (_name, body) => {
     const { upstream } = options(body);
@@ -128,7 +137,7 @@ describe('fetchGroupPredictions', () => {
     const { upstream, log, lines } = options([
       tflPrediction(),
       tflPrediction({ timeToStation: 'soon' }),
-      tflPrediction({ lineId: 'dlr' }),
+      tflPrediction({ lineId: 'tram' }),
     ]);
     const { predictions } = await fetchGroupPredictions(['central'], upstream, log);
     expect(predictions).toHaveLength(1);
@@ -159,7 +168,13 @@ describe('fetchGroupPredictions', () => {
 });
 
 describe('LINE_GROUPS', () => {
-  it('covers every Tube line exactly once', () => {
+  it('covers every line exactly once', () => {
     expect([...LINE_GROUPS.flat()].sort()).toEqual([...LINE_IDS].sort());
+  });
+
+  it('splits the lines into two phases, each with lines to refresh', () => {
+    expect(REFRESH_PHASES).toHaveLength(2);
+    for (const phase of REFRESH_PHASES) expect(phase.length).toBeGreaterThan(0);
+    expect(REFRESH_PHASES.flat()).toEqual(LINE_GROUPS);
   });
 });

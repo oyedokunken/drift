@@ -5,8 +5,9 @@
 
 **Where the official status and the real network drift apart.**
 
-Drift is a live page that checks whether Transport for London's official Tube line
-status matches what the trains are actually doing. TfL says a line has Good Service,
+Drift is a live page that checks whether Transport for London's official line
+status matches what the trains and buses are actually doing, for the Tube, the
+Elizabeth line, the DLR, the Overground and any bus route you search for. TfL says a line has Good Service,
 Drift looks at the live train predictions, and if the two disagree it says so, with
 the rule that fired, a plain reason and how confident it is.
 
@@ -27,6 +28,27 @@ only turns on for that exact query parameter and makes no network request. No re
 mismatch has appeared in the hours Drift has been watched (see
 [How it was verified](#how-it-was-verified)), so this is how the design is reviewed.
 
+## What changed
+
+Version 0.2.0 extends Drift beyond the Tube.
+
+- **Elizabeth line, DLR and Overground** are checked every two minutes, with a rule set
+  per mode and a mode switch in the page. The headline counts drift across all of them.
+  Rules that cannot be trusted on a mode are off, and any line too infrequent to judge
+  from one snapshot says "not enough data" with low confidence. Details and the data
+  behind each choice are in [docs/RULES.md](docs/RULES.md).
+- **Bus routes** are checked when you search, not polled: type a route, or open
+  `?bus=207`. Each fetch runs in the Durable Object behind a 45 second cache, shared
+  concurrent requests and a budget of 120 TfL requests a minute, so a burst of searches
+  cannot push the key past TfL's limit.
+- **The no trains rule is safer on a Sunday.** Its service window is now per day type and
+  Sunday is narrow (09:00 to 19:30 London time), because the Sunday evening end is
+  unverified. Outside the window it says "not enough data", never a mismatch.
+- **Still not done:** no real disruption has been seen firing a new rule; the Cloudflare
+  CPU for the new lines and for bus checks is not measured; bus bunching and route
+  suggestions were cut; the weekend checks fall after this handover. See
+  [Not finished](#not-finished).
+
 ## Why
 
 An official status is a statement, not a measurement. Drift compares the statement
@@ -39,7 +61,7 @@ thin, missing or ambiguous, Drift says "not enough data" rather than guessing.
 ```mermaid
 flowchart TB
   subgraph cron["Every minute (cron)"]
-    sched["Worker.scheduled"] --> arrivals["5 parallel TfL Arrivals fetches"]
+    sched["Worker.scheduled"] --> arrivals["5 parallel TfL Arrivals fetches, alternating Tube and other modes"]
     arrivals --> parse["parse, Zod, summarise()"]
   end
 
@@ -73,7 +95,12 @@ It never returns a bare 500.
 Cold start: if the store holds no line summaries, as on empty storage, the first
 request runs one refresh itself instead of waiting for the next cron tick. Concurrent
 requests share that refresh, it is capped at 7 seconds, and if it fails the page still
-gets a valid snapshot with those lines marked "not enough data". If TfL's status feed is
+gets a valid snapshot with those lines marked "not enough data". With 19 lines the cap can
+be too short on completely empty storage: on a local Worker the Elizabeth line alone took
+about 4.5 seconds to download, the cold refresh timed out and the page said "not enough
+data" until the refresh finished in the background and the 45 second snapshot cache
+expired. A deploy to the existing live storage is not affected, because the summaries are
+already there. If TfL's status feed is
 down and nothing has ever been stored, the Worker still answers with the typed 503.
 
 One live incident is not explained. Shortly after a deploy, the site showed "Live data is
@@ -94,6 +121,11 @@ origin. Every rule, with examples, is in [docs/RULES.md](docs/RULES.md).
 | Wide gaps               | Good Service or Minor Delays, but the typical gap between trains at a platform is 15 minutes or more  |
 | Long waits              | Good Service or Minor Delays, but 30 percent or more of platforms wait 20 minutes or more for a train |
 | No trains               | Good Service, a fresh feed with no trains for the line, in service hours, while other lines run       |
+| No buses                | A bus route on Good Service with no buses predicted, though it had buses in the last 90 minutes       |
+
+Not every rule runs on every mode: the Elizabeth line and the Overground have no wide
+gaps rule, the DLR has no vehicle rules, and four Overground lines keep only no trains.
+The table of which is in [docs/RULES.md](docs/RULES.md#rules-by-mode).
 
 Wide gaps and long waits work per platform (the next train wait and the gap after it),
 not on a whole line count, so a line losing part of its service cannot hide behind busy
@@ -102,7 +134,11 @@ the history is in the [changelog](CHANGELOG.md).
 
 Partial closures, planned works, Severe Delays and missing data never produce a
 mismatch. They resolve to "unknown". A network wide quiet guard stops a feed fault or
-the end of service hours from looking like every line failing at once.
+the end of service hours from looking like every line failing at once. The no trains
+rule only runs inside a provisional service window per day type (weekday 07:00 to
+22:00, Saturday 08:00 to 21:30, Sunday 09:00 to 19:30, London time). They are
+provisional because the Sunday evening end is unverified, so Sunday is narrow on
+purpose; outside the window the answer is "unknown".
 
 ## Run it locally
 
@@ -139,8 +175,8 @@ then renders the PNG, ICO and Open Graph files into `apps/web/public/`.
 
 ## Testing
 
-351 tests across 18 files, run on every push. Coverage overall is 96 percent of
-statements and 92 percent of branches, with thresholds enforced in CI (engine, shared
+729 tests across 30 files, run on every push. Coverage overall is 97.5 percent of
+statements and 94.5 percent of branches, with thresholds enforced in CI (engine, shared
 and Worker at 90 percent or more).
 
 - **Engine:** table driven cases with boundary values on both sides of every
@@ -152,7 +188,13 @@ and Worker at 90 percent or more).
   response.
 - **Web:** every state (loading, in step, mismatches, partial data, stale, offline,
   hard error with retry) with an automated accessibility check on each, plus a test
-  that computes WCAG contrast for the actual palette tokens.
+  that computes WCAG contrast for the actual palette tokens, the mode switch, and the
+  bus search in every state (idle, invalid, loading, result, not found, busy, trouble,
+  stale, a late answer, a hung request).
+- **Per mode and bus:** a reachability test for every mode profile, end to end tests per
+  mode and rule from raw predictions to a verdict, and Worker tests for the bus path
+  (validation, unknown route, large payload, cache, coalescing, budget, upstream failure
+  with and without a stale result, and the key never leaking).
 
 CI also runs typecheck, lint, format check, the build and a gitleaks secret scan.
 A local pre-commit hook runs lint and format on staged files.
@@ -225,9 +267,25 @@ Said plainly, so nothing here is a surprise.
   adjusting.
 - **Severe Delays always resolves to unknown.** Delayed trains still run, so train
   counts cannot contradict it. A deliberate cut, not an oversight.
-- **Tube only.** The Elizabeth line would fit the CPU budget but its train spacing is
-  too irregular for the wide gaps rule to be trustworthy. DLR has no vehicle ids in its
-  feed, so trains cannot be counted.
+- **The service windows are provisional.** Weekday 07:00 to 22:00, Saturday 08:00 to
+  21:30, Sunday 09:00 to 19:30 (London time). A timetable probe on 2026-11-09 was
+  unreliable and no Sunday evening check has run, so Sunday is narrow on purpose. A wrong
+  window costs a missed alarm, never a false one.
+- **Cloudflare CPU for the new lines and for bus checks is not measured.** The figures
+  in `docs/API-NOTES.md` are from Node, and Cloudflare ran about twice the Node figure for
+  the Tube. The refresh alternates two phases so each tick stays near what ran live in
+  0.1.0. Read `wrangler tail` after deploying.
+- **No real disruption has fired any new rule.** Overground lines were on Severe and
+  Minor Delays and a Part Closure during the checks, which resolve to "unknown" by design.
+- **Wide gaps is off for the Elizabeth line and the Overground**, and the infrequent
+  Overground lines (Liberty, Lioness, Suffragette, Weaver) can only fire no trains. A
+  line that is too infrequent for one snapshot to judge is shown as such.
+- **DLR has no train counts**, because `vehicleId` is blank in its feed. It is judged by
+  per platform waits and gaps only, and a Suspended or Closed DLR cannot be checked.
+- **Buses are thin.** TfL reports a route as Good Service or Special Service, a first
+  search of a route has no earlier reading, so no buses can only fire for a route seen
+  running in the last 90 minutes, night routes are always unknown, and bunching and route
+  suggestions were cut. `?sample=1` has no bus search.
 - **No dark theme.**
 - **I did not run the outage test on production.** Simulating TfL being down would
   mean overwriting the live secret with an invalid one, and I chose not to do that on the
@@ -254,8 +312,10 @@ data.
 - Watch it through a weekday peak, an overnight period and a real disruption, then
   recalibrate the thresholds and confirm the flowing while suspended rule.
 - Add a dark theme.
-- Add the Elizabeth line and the DLR if a trustworthy rule for their irregular spacing
-  and missing vehicle ids can be found.
+- Find a trustworthy rule for the Elizabeth line and the Overground spacing, which
+  differs by branch, so wide gaps can be turned on there.
+- Prove the Sunday windows with an evening check, then widen them.
+- Add bus bunching detection and route suggestions.
 - Trigger a forced upstream timeout and an outage against a local Worker as scripted
   checks, not only unit tests.
 - Record a short history of verdicts, so a mismatch can be shown with how long it lasted.

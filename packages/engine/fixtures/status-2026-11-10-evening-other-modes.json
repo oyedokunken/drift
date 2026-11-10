@@ -1,0 +1,81 @@
+{
+ "capturedAt": "2026-11-10T19:28:37.968Z",
+ "statuses": [
+  {
+   "lineId": "dlr",
+   "statuses": [
+    {
+     "severity": 10,
+     "label": "Good Service"
+    }
+   ]
+  },
+  {
+   "lineId": "elizabeth",
+   "statuses": [
+    {
+     "severity": 10,
+     "label": "Good Service"
+    }
+   ]
+  },
+  {
+   "lineId": "liberty",
+   "statuses": [
+    {
+     "severity": 10,
+     "label": "Good Service"
+    }
+   ]
+  },
+  {
+   "lineId": "lioness",
+   "statuses": [
+    {
+     "severity": 10,
+     "label": "Good Service"
+    }
+   ]
+  },
+  {
+   "lineId": "mildmay",
+   "statuses": [
+    {
+     "severity": 6,
+     "label": "Severe Delays"
+    },
+    {
+     "severity": 9,
+     "label": "Minor Delays"
+    }
+   ]
+  },
+  {
+   "lineId": "suffragette",
+   "statuses": [
+    {
+     "severity": 5,
+     "label": "Part Closure"
+    }
+   ]
+  },
+  {
+   "lineId": "weaver",
+   "statuses": [
+    {
+     "severity": 10,
+     "label": "Good Service"
+    }
+   ]
+  },
+  {
+   "lineId": "windrush",
+   "statuses": [
+    {
+     "severity": 10,
+     "label": "Good Service"
+    }
+   ]
+  }
+ ]
+}

@@ -1,5 +1,13 @@
-export { LINE_IDS, lineIdSchema } from './lines.ts';
-export type { LineId } from './lines.ts';
+export {
+  LINE_IDS,
+  MODE_IDS,
+  OVERGROUND_LINE_IDS,
+  TUBE_LINE_IDS,
+  lineIdSchema,
+  modeIdSchema,
+  modeOfLine,
+} from './lines.ts';
+export type { LineId, ModeId } from './lines.ts';
 export { predictionSchema } from './prediction.ts';
 export type { Prediction } from './prediction.ts';
 export { lineStatusSchema, officialStatusSchema } from './official.ts';
@@ -17,3 +25,5 @@ export {
 export type { Confidence, Observed, Outcome, RuleId, Verdict } from './verdict.ts';
 export { ERROR_CODES, apiErrorSchema, snapshotSchema } from './snapshot.ts';
 export type { ApiError, Snapshot } from './snapshot.ts';
+export { busResultSchema, busRouteSchema, busVerdictSchema } from './bus.ts';
+export type { BusResult, BusRoute, BusVerdict } from './bus.ts';

@@ -31,6 +31,7 @@ function getApp(env: Env): (request: Request) => Promise<Response> {
       },
     }),
     // The Workers cache is a global with a `default` namespace.
+    bus: (route) => storeStub(env).checkBus(route),
     cache: (caches as unknown as { default: Cache }).default,
     assets: (request) => env.ASSETS.fetch(request),
   });
@@ -42,7 +43,9 @@ export default {
     return getApp(env)(request);
   },
 
-  scheduled(_controller, env, ctx) {
-    ctx.waitUntil(storeStub(env).refresh());
+  scheduled(controller, env, ctx) {
+    // One phase per minute, alternating, so each tick parses only some of the lines.
+    const phase = Math.floor(controller.scheduledTime / 60_000) % 2;
+    ctx.waitUntil(storeStub(env).refresh(phase));
   },
 } satisfies ExportedHandler<Env>;

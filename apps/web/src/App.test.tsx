@@ -288,11 +288,11 @@ describe('footer', () => {
 describe('sample mode', () => {
   const SAMPLE_BANNER = 'Sample data, not live';
 
-  it('shows the banner, three mismatches and makes no request', async () => {
+  it('shows the banner, four mismatches and makes no request', async () => {
     const fetchMock = stubFetch(() => new Promise<Response>(() => undefined));
     const { container } = render(<App search="?sample=1" />);
     expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
-      '3 of 11 lines are drifting',
+      '4 of 19 lines are drifting',
     );
     expect(screen.getByRole('note')).toHaveTextContent(SAMPLE_BANNER);
     expect(fetchMock).not.toHaveBeenCalled();

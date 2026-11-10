@@ -1,11 +1,13 @@
 import { m } from 'framer-motion';
 import { useEffect, useState, type ReactNode } from 'react';
 import type { Snapshot } from '@drift/shared';
+import { BusSearch } from './components/bus-search.tsx';
 import { Age } from './components/freshness.tsx';
 import { Footer } from './components/footer.tsx';
 import { Hero } from './components/hero.tsx';
 import { LineRow } from './components/line-row.tsx';
 import { MismatchCard } from './components/mismatch-card.tsx';
+import { ModeSwitch } from './components/mode-switch.tsx';
 import {
   AllClear,
   Banner,
@@ -15,8 +17,15 @@ import {
 } from './components/states.tsx';
 import { isSampleRequested } from './lib/sample-mode.ts';
 import { useOnline } from './lib/use-clock.ts';
+import { routeFromSearch } from './lib/use-bus.ts';
 import { useSnapshot } from './lib/use-snapshot.ts';
-import { countOutcomes, sortVerdicts } from './lib/view.ts';
+import {
+  MODE_LABELS,
+  countOutcomes,
+  filterByMode,
+  sortVerdicts,
+  type ModeFilter,
+} from './lib/view.ts';
 import { MotionRoot, itemVariants, listVariants } from './motion/motion.tsx';
 
 /** Verdicts that are unknown only because no live train data arrived for the line. */
@@ -85,9 +94,11 @@ function Dashboard({
   readonly online: boolean;
   readonly failures: number;
 }) {
+  const [mode, setMode] = useState<ModeFilter>('all');
   const sorted = sortVerdicts(snapshot.verdicts);
   const drifting = sorted.filter((verdict) => verdict.outcome === 'mismatch');
   const counts = countOutcomes(snapshot.verdicts);
+  const shown = filterByMode(sorted, mode);
 
   return (
     <>
@@ -128,13 +139,14 @@ function Dashboard({
 
       <section className="section" aria-labelledby="all-lines-title">
         <h2 id="all-lines-title" className="section__title">
-          All lines
+          {mode === 'all' ? 'All lines' : `${MODE_LABELS[mode]} lines`}
         </h2>
         <p className="section__lede">
           The official status beside what the live trains show.
         </p>
+        <ModeSwitch value={mode} onChange={setMode} verdicts={snapshot.verdicts} />
         <m.ul className="stack" variants={listVariants} initial="hidden" animate="show">
-          {sorted.map((verdict) => (
+          {shown.map((verdict) => (
             <m.li key={verdict.lineId} variants={itemVariants} layout="position">
               <LineRow verdict={verdict} />
             </m.li>
@@ -180,7 +192,7 @@ function Page({
   );
 }
 
-function LiveApp() {
+function LiveApp({ search }: { readonly search: string }) {
   const { status, data, failures, refreshing, refresh } = useSnapshot();
   const online = useOnline();
 
@@ -216,6 +228,7 @@ function LiveApp() {
           />
         </>
       )}
+      <BusSearch initialRoute={routeFromSearch(search)} />
     </Page>
   );
 }
@@ -265,5 +278,5 @@ function SampleApp() {
 }
 
 export function App({ search = window.location.search }: { readonly search?: string }) {
-  return isSampleRequested(search) ? <SampleApp /> : <LiveApp />;
+  return isSampleRequested(search) ? <SampleApp /> : <LiveApp search={search} />;
 }

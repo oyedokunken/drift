@@ -1,10 +1,18 @@
-import { LINE_IDS, type LineId, type Snapshot, type Verdict } from '@drift/shared';
+import {
+  LINE_IDS,
+  TUBE_LINE_IDS,
+  modeOfLine,
+  type LineId,
+  type Snapshot,
+  type Verdict,
+} from '@drift/shared';
 
 export const GENERATED_AT = '2026-11-08T09:00:00.000Z';
 
 export function verdict(lineId: LineId, overrides: Partial<Verdict> = {}): Verdict {
   return {
     lineId,
+    mode: modeOfLine(lineId),
     official: { severity: 10, label: 'Good Service' },
     observed: {
       vehicles15: 30,
@@ -103,7 +111,7 @@ export function snapshot(
   overrides: Partial<Snapshot> = {},
   replace: readonly Verdict[] = [],
 ): Snapshot {
-  const verdicts = LINE_IDS.map(
+  const verdicts = TUBE_LINE_IDS.map(
     (lineId) => replace.find((v) => v.lineId === lineId) ?? verdict(lineId),
   );
   return {
@@ -113,6 +121,16 @@ export function snapshot(
     stale: false,
     verdicts,
     ...overrides,
+  };
+}
+
+/** A snapshot of every line across all modes, where every line matches unless replaced. */
+export function allModesSnapshot(replace: readonly Verdict[] = []): Snapshot {
+  return {
+    ...snapshot(),
+    verdicts: LINE_IDS.map(
+      (lineId) => replace.find((v) => v.lineId === lineId) ?? verdict(lineId),
+    ),
   };
 }
 
