@@ -49,6 +49,16 @@ Version 0.2.0 extends Drift beyond the Tube.
   suggestions were cut; the weekend checks fall after this handover. See
   [Not finished](#not-finished).
 
+| Mode switch (Overground), 375px                         | Bus route search, 375px                              |
+| ------------------------------------------------------- | ---------------------------------------------------- |
+| ![Mode switch at 375px](docs/screenshots/modes-375.png) | ![Bus search at 375px](docs/screenshots/bus-375.png) |
+
+| Mode switch, 1280px                                       | Bus route search, 1280px                               |
+| --------------------------------------------------------- | ------------------------------------------------------ |
+| ![Mode switch at 1280px](docs/screenshots/modes-1280.png) | ![Bus search at 1280px](docs/screenshots/bus-1280.png) |
+
+These four are the real live site on 2026-11-10 after the 0.2.0 deploy.
+
 ## Why
 
 An official status is a statement, not a measurement. Drift compares the statement
@@ -226,8 +236,11 @@ See [docs/VERIFICATION.md](docs/VERIFICATION.md) for the dated record. In short:
 - The outage behaviour was exercised against the real TfL API on a local Worker with
   real persisted storage: success, a stale fallback when TfL rejected the key, and a
   typed 503 with empty storage. The key appeared in no log or response.
-- Lighthouse on the deployed site, mobile profile, median of three runs:
-  **Performance 98, Accessibility 100, Best Practices 100, SEO 100** (after the 2026-11-08 redesign).
+- Lighthouse on the deployed site, mobile profile, median of three runs: **Performance
+  93, Accessibility 100, Best Practices 100, SEO 100** after the 0.2.0 deploy on 2026-11-10
+  (runs scored 93, 97 and 90, with total blocking time 130 to 340 ms). It was 98 for 0.1.0 on
+  2026-11-08. The runs are noisy, from a busy laptop, and I have not isolated whether the
+  drop is the extra mode and bus code or the machine.
 - No horizontal scroll at 320, 375, 768 or 1280 pixels.
 
 Size: the initial JavaScript is about 115 KB gzipped (React is 67 KB of that), with a

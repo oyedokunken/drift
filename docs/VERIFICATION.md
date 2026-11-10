@@ -251,14 +251,50 @@ asked for (a very frequent day route, 207, a less frequent one, 490, and night r
 N207 and N18) all resolved sensibly. The night routes were the least informative: a night
 route is always unknown, and at 19:57 it had no buses to show.
 
-### Band 2
+### Band 2: 21:06 London, Tuesday 2026-11-10
 
-A second band is required for every mode and for the night routes, and has not run yet.
-It is planned for after 23:30 London time tonight (the night routes should be running
-then) or early tomorrow morning, and will be recorded here with any rule that fires. If
-this section still says "not run", it did not happen.
+Run after the deploy, as the band 2 check, about an hour after band 1. The late night run
+planned for about 23:40 London depends on this session staying open, so treat it as extra.
 
-Status of the bands: band 1 (evening) done, band 2 not run.
+| Line             | Mode           | Official      | Verdict | Rule                | Platforms | Long waits | Median gap |
+| ---------------- | -------------- | ------------- | ------- | ------------------- | --------- | ---------- | ---------- |
+| Bakerloo         | tube           | Good Service  | in step | in-step             | 49        | 0          | 4 min      |
+| Central          | tube           | Minor Delays  | in step | in-step             | 87        | 0          | 4 min      |
+| Circle           | tube           | Good Service  | in step | in-step             | 49        | 0          | 10 min     |
+| District         | tube           | Minor Delays  | in step | in-step             | 111       | 1          | 4 min      |
+| DLR              | dlr            | Good Service  | in step | in-step             | 97        | 1          | 5 min      |
+| Elizabeth line   | elizabeth-line | Good Service  | in step | in-step             | 91        | 2          | 7 min      |
+| Hammersmith City | tube           | Good Service  | in step | in-step             | 84        | 3          | 9 min      |
+| Jubilee          | tube           | Minor Delays  | in step | in-step             | 53        | 0          | 2 min      |
+| Liberty          | overground     | Good Service  | unknown | not-measurable      | 3         | 0          | 0 min      |
+| Lioness          | overground     | Good Service  | unknown | not-measurable      | 40        | 0          | 15 min     |
+| Metropolitan     | tube           | Good Service  | in step | in-step             | 72        | 0          | 5 min      |
+| Mildmay          | overground     | Minor Delays  | in step | in-step             | 61        | 0          | 5 min      |
+| Northern         | tube           | Good Service  | in step | in-step             | 112       | 0          | 3 min      |
+| Piccadilly       | tube           | Good Service  | in step | in-step             | 107       | 1          | 5 min      |
+| Suffragette      | overground     | Part Closure  | unknown | partial-status      | 11        | 0          | 14 min     |
+| Victoria         | tube           | Severe Delays | unknown | delays-unverifiable | 31        | 0          | 4 min      |
+| Waterloo & City  | tube           | Good Service  | in step | in-step             | 3         | 0          | 26 min     |
+| Weaver           | overground     | Good Service  | unknown | not-measurable      | 50        | 4          | 15 min     |
+| Windrush         | overground     | Good Service  | in step | in-step             | 60        | 0          | 3 min      |
+
+| Route | Official        | Verdict | Rule           | Stops | Long waits | Median gap | Why                                     |
+| ----- | --------------- | ------- | -------------- | ----- | ---------- | ---------- | --------------------------------------- |
+| 207   | Good Service    | in step | in-step        | 90    | 0          | 5 min      | A very frequent route                   |
+| 73    | Good Service    | in step | in-step        | 63    | 0          | 7 min      | A frequent route                        |
+| 490   | Good Service    | unknown | not-measurable | 85    | 1          | 15 min     | Now 15 minutes apart, so too infrequent |
+| W11   | Special Service | unknown | partial-status | 25    | 7          | 9 min      | Special Service, and only 25 stops      |
+| N207  | Good Service    | unknown | not-measurable | 0     | 0          | none       | A night route, no buses at 21:06        |
+| N18   | Special Service | unknown | partial-status | 0     | 0          | none       | A night route, no buses at 21:06        |
+
+**No rule fired on 19 lines or 6 bus routes, so there is nothing to classify as a real
+problem or a false alarm.** Two things worth noting. Route 490 was 9 minutes apart in band 1
+and 15 here, and the bus rule correctly stopped judging it as it became infrequent. Mildmay's
+severe delays had cleared to minor delays, and it is in step.
+
+Status of the bands: band 1 (19:57) and band 2 (21:06) done, both on a weekday evening. No
+late night, morning or weekend band has run, so the night routes and the Sunday windows are
+still unproven.
 
 ### The Worker run locally with real storage (2026-11-10, 20:09 to 20:15 London)
 
@@ -285,6 +321,65 @@ Status of the bands: band 1 (evening) done, band 2 not run.
 - **Not verified:** that any new rule fires correctly in a real disruption (none did), the
   Sunday windows, the night routes while running, and the Cloudflare CPU for the new lines
   and for a bus check.
+
+## The deployed site (2026-11-10, version 360e740e, deployed 21:00 London)
+
+Deployed with `pnpm deploy` from `main` after merging pull request #2. Previous version
+`447ba5ce` was kept as the rollback target. `wrangler tail` ran during the deploy and for
+five minutes after.
+
+Live checks with curl:
+
+| Request          | Result                                                                           |
+| ---------------- | -------------------------------------------------------------------------------- |
+| `/`              | 200, HTML                                                                        |
+| `/api/health`    | 200 `{"ok":true}`                                                                |
+| `/api/snapshot`  | 200, 19 verdicts, fresh (10 Tube in step, DLR, Elizabeth line, Windrush in step) |
+| `/api/bus/207`   | 200, a verdict, in step (first call 3.3 s, it also fetched the route list)       |
+| `/api/bus/ZZZ9`  | 404 `route_not_found`, typed                                                     |
+| `/api/bus/207!!` | 400 `invalid_route`, typed                                                       |
+
+Right after the deploy the snapshot read "not enough data" for every line, as expected: the
+summaries stored by 0.1.0 lack the new `longWaitPlatforms` field and are skipped. The
+cold start refresh hit the 7 second cap (TfL timed out on some of the ten parallel calls and
+was retried), the refresh finished anyway and all 19 lines were fresh about 8 seconds later.
+
+CPU as reported by `wrangler tail`, Cloudflare, not Node:
+
+| Invocation                                          | CPU          | Wall time    |
+| --------------------------------------------------- | ------------ | ------------ |
+| Durable Object refresh, Tube phase (11 lines)       | 67 to 103 ms | 1.6 to 5.5 s |
+| Durable Object refresh, other modes phase (8 lines) | 63 to 86 ms  | 1.1 to 8.3 s |
+| Durable Object refresh, all 19 lines, cold start    | 146 ms       | 7 s          |
+| 0.1.0 refresh of 11 Tube lines, for comparison      | 75 ms        | 3.6 s        |
+| Bus check in the Durable Object, cached             | 0 to 1 ms    | 10 to 14 ms  |
+| Bus check, a route fetched (207, 73, 490, W11, 18)  | 4 to 16 ms   | 0.2 to 5.5 s |
+| Bus check, first ever (route list plus route)       | 65 ms        | 2.6 s        |
+| `/api/snapshot`, cold start                         | 11 ms        | 7.6 s        |
+| `/api/snapshot`, cached, and `/api/bus/*` handler   | 1 to 10 ms   | 2 to 600 ms  |
+| Cron handler                                        | 1 to 2 ms    | 1 to 8 s     |
+
+No invocation reported an error or an exception, and every outcome was `ok`. The phase split
+worked: each tick is about the same cost as the 0.1.0 refresh. A bus check of a large route
+used up to 16 ms of CPU, which is above the documented 10 ms free plan figure for a request,
+but it runs in the Durable Object, whose documented limit is far higher, and Cloudflare did
+not stop it. That is an observation, as in `docs/ARCHITECTURE.md`, not a guarantee. One
+`canceled` outcome appeared on the cold start refresh RPC after the request that started it
+gave up at 7 seconds; the refresh itself still logged `refreshed: 19`.
+
+### Lighthouse on the live site (2026-11-10, after the deploy)
+
+Mobile profile, three runs, headless Chrome on a busy Windows laptop:
+
+| Run | Performance | Accessibility | Best Practices | SEO | LCP   | CLS | TBT    |
+| --- | ----------- | ------------- | -------------- | --- | ----- | --- | ------ |
+| 1   | 93          | 100           | 100            | 100 | 2.2 s | 0   | 220 ms |
+| 2   | 97          | 100           | 100            | 100 | 2.1 s | 0   | 130 ms |
+| 3   | 90          | 100           | 100            | 100 | 2.1 s | 0   | 340 ms |
+
+Median: Performance 93, Accessibility 100, Best Practices 100, SEO 100. 0.1.0 scored 98 on
+Performance on 2026-11-08. The difference is within the spread of these three runs, so it
+is not shown to be real, but it is not shown to be nothing either.
 
 ## Not verified, said plainly
 
