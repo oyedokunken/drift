@@ -1,5 +1,11 @@
 import type { ArrivalSummary, LineId, Prediction } from '@drift/shared';
-import { NEAR_HORIZON_SEC, profileOf } from './config.ts';
+import { NEAR_HORIZON_SEC, profileOf, type ModeProfile } from './config.ts';
+
+/** A prediction without the line it belongs to, so a bus route can be summarised too. */
+export type TrainPrediction = Omit<Prediction, 'lineId'>;
+
+/** A summary without the line it describes. */
+export type SummaryBody = Omit<ArrivalSummary, 'lineId'>;
 
 function median(values: readonly number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
@@ -41,7 +47,15 @@ export function summarise(
   predictions: readonly Prediction[],
   fetchedAt: Date,
 ): ArrivalSummary {
-  const profile = profileOf(lineId);
+  return { lineId, ...summariseWith(profileOf(lineId), predictions, fetchedAt) };
+}
+
+/** The same reduction for any profile, which is how a bus route is summarised. */
+export function summariseWith(
+  profile: ModeProfile,
+  predictions: readonly TrainPrediction[],
+  fetchedAt: Date,
+): SummaryBody {
   const usable = predictions.filter(
     (p) =>
       (!profile.vehicleIdsUsable || p.vehicleId.trim() !== '') &&
@@ -84,7 +98,6 @@ export function summarise(
     profile.vehicleIdsUsable ? set.size : null;
 
   return {
-    lineId,
     fetchedAt: fetchedAt.toISOString(),
     predictionCount: predictions.length,
     vehicles15: counted(vehicles15),

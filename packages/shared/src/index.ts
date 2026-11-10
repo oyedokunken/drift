@@ -25,3 +25,5 @@ export {
 export type { Confidence, Observed, Outcome, RuleId, Verdict } from './verdict.ts';
 export { ERROR_CODES, apiErrorSchema, snapshotSchema } from './snapshot.ts';
 export type { ApiError, Snapshot } from './snapshot.ts';
+export { busResultSchema, busRouteSchema, busVerdictSchema } from './bus.ts';
+export type { BusResult, BusRoute, BusVerdict } from './bus.ts';

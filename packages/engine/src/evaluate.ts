@@ -30,7 +30,7 @@ import {
 } from './config.ts';
 import { isWithinOperatingHours } from './hours.ts';
 
-interface Result {
+export interface Result {
   readonly outcome: Outcome;
   readonly ruleId: RuleId;
   readonly reason: string;
@@ -133,6 +133,20 @@ function describeNetwork(summaries: readonly ArrivalSummary[], now: Date): Netwo
     emptyLines: summaries.filter((s) => isFresh(s, now) && s.predictionCount === 0)
       .length,
   };
+}
+
+/**
+ * Whether the rest of the feed is being reported normally: enough lines running, not
+ * quiet as a whole, and not several empty at once. A bus check leans on this, since it
+ * cannot see other routes.
+ */
+export function isFeedHealthy(summaries: readonly ArrivalSummary[], now: Date): boolean {
+  const network = describeNetwork(summaries, now);
+  return (
+    !network.quiet &&
+    network.runningLines >= NO_TRAINS_MIN_RUNNING_LINES &&
+    network.emptyLines < NO_TRAINS_FAULT_LINES
+  );
 }
 
 function quietFloor(lineId: LineId): number {
@@ -306,7 +320,7 @@ function evaluateClosed(label: string, vehicles15: number): Result {
 }
 
 /** Verdicts decided by the official status alone, before any live data is consulted. */
-function statusOnlyResult(kind: StatusKind, label: string): Result | null {
+export function statusOnlyResult(kind: StatusKind, label: string): Result | null {
   switch (kind) {
     case 'unclassified':
       return {

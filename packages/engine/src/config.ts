@@ -251,6 +251,39 @@ const OVERGROUND_PROFILE: ModeProfile = {
   },
 };
 
+/**
+ * Bus routes, checked one at a time when a visitor searches for them. Measured live on
+ * 2026-11-10 at 19:50 London time on routes 207, 18, 490, W11, 73, 25, 5, 36, H98 and E1:
+ * no healthy route had more than 7.7 percent of its stops wait 20 minutes (route 18)
+ * except W11, a short route with 26 stops, at 19 percent. 40 percent is twice that.
+ * Buses are not counted, so no vehicle rules, and the median gap is not trusted as an
+ * alarm because routes bunch, so wide gaps is off. TfL reports a bus route as Good
+ * Service or Special Service, so there is little status to contradict.
+ */
+export const BUS_PROFILE: ModeProfile = {
+  ...TUBE_PROFILE,
+  allRulesInWindow: true,
+  rules: { ...NO_TRAINS_ONLY, longWaits: true },
+  longWaitShare: 0.4,
+  longWaitHighShare: 0.6,
+  minPlatforms: 15,
+  smallSamplePlatforms: 30,
+};
+
+/**
+ * A long wait only counts on a route that normally runs often. A stop waiting 20 minutes
+ * is ordinary on a route with a bus every 20, so routes with a typical gap above this are
+ * left unknown. Routes checked ran 3.6 to 12 minutes apart at the median.
+ */
+export const BUS_FREQUENT_MAX_HEADWAY_SEC = 12 * 60;
+
+/**
+ * A route with no buses predicted is only a mismatch if an earlier reading, no older
+ * than this, showed buses on it. Without that, a route that is not running today cannot
+ * be told from one that has stopped.
+ */
+export const BUS_HISTORY_MAX_AGE_SEC = 90 * 60;
+
 export const MODE_PROFILES: Readonly<Record<ModeId, ModeProfile>> = {
   tube: TUBE_PROFILE,
   'elizabeth-line': ELIZABETH_PROFILE,

@@ -11,6 +11,7 @@ import {
 import predictionFixture from '../fixtures/predictions-2026-11-10-evening-other-modes.json' with { type: 'json' };
 import statusFixture from '../fixtures/status-2026-11-10-evening-other-modes.json' with { type: 'json' };
 import {
+  BUS_PROFILE,
   LONG_WAIT_SEC,
   MODE_PROFILES,
   profileOf,
@@ -95,7 +96,10 @@ function verdictFor(
 }
 
 describe('mode profiles', () => {
-  const profiles = Object.entries<ModeProfile>(MODE_PROFILES);
+  const profiles = [
+    ...Object.entries<ModeProfile>(MODE_PROFILES),
+    ['bus', BUS_PROFILE] as [string, ModeProfile],
+  ];
 
   it('has a profile for every mode and a mode for every line', () => {
     expect(Object.keys(MODE_PROFILES).sort()).toEqual([...MODE_IDS].sort());

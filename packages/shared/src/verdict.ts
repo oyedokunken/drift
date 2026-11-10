@@ -10,6 +10,7 @@ export const RULE_IDS = [
   'wide-gaps',
   'long-waits',
   'no-trains',
+  'no-buses',
   'closed-hours',
   'in-step',
   'partial-status',
