@@ -31,6 +31,7 @@ function getApp(env: Env): (request: Request) => Promise<Response> {
       },
     }),
     // The Workers cache is a global with a `default` namespace.
+    bus: (route) => storeStub(env).checkBus(route),
     cache: (caches as unknown as { default: Cache }).default,
     assets: (request) => env.ASSETS.fetch(request),
   });

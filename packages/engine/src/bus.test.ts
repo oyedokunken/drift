@@ -39,7 +39,7 @@ function check(overrides: Partial<BusCheck> & Pick<BusCheck, 'summary'>): BusChe
   return {
     routeId: '207',
     statuses: GOOD,
-    previous: null,
+    lastRunningAt: null,
     feedHealthy: true,
     now: NOW,
     ...overrides,
@@ -121,10 +121,10 @@ describe('bus route with buses, end to end from raw predictions', () => {
 
 describe('bus route with no buses predicted', () => {
   const silent = reading([]);
-  const earlier = reading(stops(30, [3, 9]), new Date('2026-11-10T13:30:00.000Z'));
+  const earlier = new Date('2026-11-10T13:30:00.000Z');
 
   it('is a mismatch when the route had buses 30 minutes ago and the feed is healthy', () => {
-    const verdict = evaluateBus(check({ summary: silent, previous: earlier }));
+    const verdict = evaluateBus(check({ summary: silent, lastRunningAt: earlier }));
     expect(verdict).toMatchObject({
       outcome: 'mismatch',
       ruleId: 'no-buses',
@@ -134,17 +134,19 @@ describe('bus route with no buses predicted', () => {
   });
 
   it.each([
-    ['there is no earlier reading', { previous: null }],
+    ['there is no earlier reading', { lastRunningAt: null }],
     [
-      'the earlier reading is over 90 minutes old',
-      { previous: reading(stops(30, [3, 9]), new Date('2026-11-10T12:00:00.000Z')) },
+      'the route last had buses over 90 minutes ago',
+      { lastRunningAt: new Date('2026-11-10T12:00:00.000Z') },
     ],
-    ['the earlier reading was also empty', { previous: reading([]) }],
-    ['the rest of the feed looks unhealthy', { previous: earlier, feedHealthy: false }],
-    ['it is a night route', { previous: earlier, routeId: 'N207' }],
+    [
+      'the rest of the feed looks unhealthy',
+      { lastRunningAt: earlier, feedHealthy: false },
+    ],
+    ['it is a night route', { lastRunningAt: earlier, routeId: 'N207' }],
     [
       'the status is Minor Delays, not Good Service',
-      { previous: earlier, statuses: [{ severity: 9, label: 'Minor Delays' }] },
+      { lastRunningAt: earlier, statuses: [{ severity: 9, label: 'Minor Delays' }] },
     ],
   ] as const)('stays unknown when %s', (_name, overrides) => {
     const verdict = evaluateBus(check({ summary: silent, ...overrides }));
@@ -161,7 +163,7 @@ describe('bus route with no buses predicted', () => {
     const verdict = evaluateBus(
       check({
         summary: reading([], now),
-        previous: reading(stops(30, [3, 9]), now),
+        lastRunningAt: now,
         now,
       }),
     );

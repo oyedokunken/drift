@@ -1,9 +1,12 @@
 import { z } from 'zod';
+import type { TrainPrediction } from '@drift/engine';
 import {
+  busRouteSchema,
   lineIdSchema,
   predictionSchema,
   type LineId,
   type LineStatus,
+  type OfficialStatus,
   type Prediction,
 } from '@drift/shared';
 import type { Logger } from './log.ts';
@@ -143,4 +146,100 @@ export async function fetchGroupPredictions(
     log('warn', 'predictions_dropped', { lines: lines.join(','), dropped });
 
   return { lines, predictions };
+}
+
+/** One entry of TfL's bus route listing, reduced to what Drift stores. */
+export interface BusRouteName {
+  readonly id: string;
+  readonly name: string;
+}
+
+const tflBusRouteSchema = z.object({ id: z.string(), name: z.string().min(1) });
+
+/**
+ * Every bus route, as ids and names only. The listing is about 350 KB for 675 routes and
+ * parses in a few milliseconds, but it holds nothing Drift needs beyond these two fields.
+ * Items with an id that is not a valid route are dropped.
+ */
+export async function fetchBusRoutes(options: UpstreamOptions): Promise<BusRouteName[]> {
+  const items = asArray(await fetchTflJson('/Line/Mode/bus', options), 'Bus routes');
+  const routes = new Map<string, BusRouteName>();
+  for (const item of items) {
+    const parsed = tflBusRouteSchema.safeParse(item);
+    const id = parsed.success ? busRouteSchema.safeParse(parsed.data.id) : null;
+    if (parsed.success && id?.success === true) {
+      routes.set(id.data, { id: id.data, name: parsed.data.name });
+    }
+  }
+  if (routes.size === 0) {
+    throw new UpstreamError('parse', 'Bus route listing held no readable routes');
+  }
+  return [...routes.values()];
+}
+
+const tflBusPredictionSchema = z.object({
+  vehicleId: z.string().optional(),
+  naptanId: z.string(),
+  platformName: z.string().nullish(),
+  direction: z.string().optional(),
+  timeToStation: z.number().int(),
+});
+
+export interface BusRouteData {
+  readonly statuses: readonly [OfficialStatus, ...OfficialStatus[]];
+  readonly predictions: readonly TrainPrediction[];
+}
+
+function toBusPrediction(item: unknown): TrainPrediction | null {
+  const parsed = tflBusPredictionSchema.safeParse(item);
+  if (!parsed.success) return null;
+  const { direction, vehicleId, platformName, ...rest } = parsed.data;
+  const normalised = asDirection(direction);
+  return {
+    ...rest,
+    vehicleId: vehicleId ?? '',
+    platformName: platformName ?? '',
+    ...(normalised === undefined ? {} : { direction: normalised }),
+  };
+}
+
+/**
+ * One bus route's official status and live predictions, fetched together. A route with no
+ * buses due is a valid answer. The route id is already validated, so it is safe in a path.
+ */
+export async function fetchBusRoute(
+  route: string,
+  options: UpstreamOptions,
+  log: Logger,
+): Promise<BusRouteData> {
+  const [statusBody, arrivalsBody] = await Promise.all([
+    fetchTflJson(`/Line/${route}/Status`, options),
+    fetchTflJson(`/Line/${route}/Arrivals`, options),
+  ]);
+
+  const status = tflLineStatusSchema.safeParse(asArray(statusBody, 'Bus status')[0]);
+  const [first, ...rest] = status.success
+    ? status.data.lineStatuses.map((s) => ({
+        severity: s.statusSeverity,
+        label: s.statusSeverityDescription,
+      }))
+    : [];
+  if (first === undefined) {
+    throw new UpstreamError('parse', 'Bus status response held no readable status');
+  }
+
+  const items = asArray(arrivalsBody, 'Bus arrivals');
+  const predictions = items
+    .map(toBusPrediction)
+    .filter((p): p is TrainPrediction => p !== null);
+  if (items.length > 0 && predictions.length === 0) {
+    throw new UpstreamError(
+      'parse',
+      'Bus arrivals response held no readable predictions',
+    );
+  }
+  const dropped = items.length - predictions.length;
+  if (dropped > 0) log('warn', 'predictions_dropped', { route, dropped });
+
+  return { statuses: [first, ...rest], predictions };
 }

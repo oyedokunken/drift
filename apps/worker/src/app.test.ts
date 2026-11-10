@@ -41,6 +41,7 @@ function setup(status: () => Response) {
   const app = createApp({
     now: () => NOW,
     snapshot,
+    bus: () => Promise.resolve({ kind: 'unavailable' }),
     cache,
     assets: (request) => {
       assetCalls.push(new URL(request.url).pathname);

@@ -16,8 +16,8 @@ export interface BusCheck {
   readonly routeId: string;
   readonly statuses: readonly [OfficialStatus, ...OfficialStatus[]];
   readonly summary: SummaryBody;
-  /** The route's last reading, if there is one, to tell "stopped" from "not running". */
-  readonly previous: SummaryBody | null;
+  /** When this route last had buses predicted, to tell "stopped" from "not running". */
+  readonly lastRunningAt: Date | null;
   /** True when the Tube and the other modes are being reported normally right now. */
   readonly feedHealthy: boolean;
   readonly now: Date;
@@ -42,23 +42,21 @@ function observedFrom(summary: SummaryBody): Observed {
   };
 }
 
-function minutesSince(summary: SummaryBody, now: Date): number {
-  return Math.round((now.getTime() - Date.parse(summary.fetchedAt)) / 60_000);
+function secondsSince(then: Date, now: Date): number {
+  return (now.getTime() - then.getTime()) / 1000;
 }
 
 /** A route with nothing predicted: a mismatch only if it was running a moment ago. */
 function evaluateSilent(check: BusCheck, label: string, allGood: boolean): Result {
-  const { previous, now, feedHealthy } = check;
+  const { lastRunningAt, now, feedHealthy } = check;
   const wasRunning =
-    previous !== null &&
-    previous.predictionCount > 0 &&
-    minutesSince(previous, now) * 60 <= BUS_HISTORY_MAX_AGE_SEC;
+    lastRunningAt !== null && secondsSince(lastRunningAt, now) <= BUS_HISTORY_MAX_AGE_SEC;
 
-  if (allGood && feedHealthy && previous !== null && wasRunning) {
+  if (allGood && feedHealthy && lastRunningAt !== null && wasRunning) {
     return {
       outcome: 'mismatch',
       ruleId: 'no-buses',
-      reason: `Official status is ${label} but no buses are predicted on this route, and it had buses ${minutesSince(previous, now)} minutes ago.`,
+      reason: `Official status is ${label} but no buses are predicted on this route, and it had buses ${Math.round(secondsSince(lastRunningAt, now) / 60)} minutes ago.`,
       confidence: 'medium',
     };
   }
