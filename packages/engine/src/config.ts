@@ -39,20 +39,62 @@ export const FLOWING_MIN_VEHICLES = 6;
 /** Clearly healthy flow, used to raise confidence. */
 export const FLOWING_HIGH_VEHICLES = 12;
 
-/** Slowest healthy typical headway observed was 10 minutes (Circle). 15 is a 1.5 times margin. */
+/**
+ * Typical gap between trains at a platform, as the median over platforms of the gap
+ * between the first and second train. Healthy medians on 2026-11-08 were 3 minutes
+ * (Victoria), 4 (Bakerloo) and 10 (Circle, the slowest). 15 is a 1.5 times margin, and
+ * it can be reached: two trains inside the horizon can be 30 minutes apart.
+ */
 export const WIDE_HEADWAY_SEC = 15 * 60;
 
-/** Headway this large is unambiguous. */
+/** Headway this large is unambiguous. Reachable, since the horizon allows 30 minutes. */
 export const WIDE_HEADWAY_HIGH_SEC = 25 * 60;
 
-/** Fewest platforms with enough predictions before a headway can be trusted. */
-export const MIN_PLATFORMS_FOR_HEADWAY = 5;
+/**
+ * A platform whose next train is this far off counts as waiting too long. On
+ * 2026-11-08 the longest healthy wait was 18 minutes (Circle) and no platform on the
+ * four sampled lines waited 20. Must stay below FAR_HORIZON_SEC to be reachable.
+ */
+export const LONG_WAIT_SEC = 20 * 60;
 
-/** Below this many measured platforms the headway verdict has low confidence. */
+/**
+ * Share of a line's platforms that must wait at least LONG_WAIT_SEC before the line is
+ * flagged. No healthy platform did on the sampled lines, and 14 percent of the Circle
+ * line's waited 15 minutes, so 30 percent is about twice the worst near miss.
+ */
+export const LONG_WAIT_PLATFORM_SHARE = 0.3;
+
+/** A share this large of long waiting platforms is half the line, which is unambiguous. */
+export const LONG_WAIT_HIGH_SHARE = 0.5;
+
+/** Fewest platforms with a train before a wait or gap verdict can be trusted. */
+export const MIN_PLATFORMS_MEASURED = 5;
+
+/** Below this many measured platforms the wait and gap verdicts have low confidence. */
 export const SMALL_SAMPLE_PLATFORMS = 10;
 
-/** Fewest predictions at one platform needed to measure a gap there. */
-export const MIN_PREDICTIONS_PER_PLATFORM = 3;
+/**
+ * Service hours inside which every Tube line is expected to run, in London local
+ * time, as minutes after midnight. Deliberately narrower than the published first and
+ * last trains so that the start and end of service never raise an alarm.
+ */
+export const OPERATING_START_MIN = 7 * 60;
+export const OPERATING_END_MIN = 22 * 60;
+
+/** Time zone the operating hours are read in, so daylight saving needs no handling. */
+export const OPERATING_TIME_ZONE = 'Europe/London';
+
+/**
+ * Lines that must be running normally (at least QUIET_MIN_VEHICLES due) before another
+ * line with no trains at all can be called a mismatch.
+ */
+export const NO_TRAINS_MIN_RUNNING_LINES = 4;
+
+/**
+ * Lines with a fresh but empty feed at once that point to a feed fault. The worker fetches
+ * lines in groups, so one empty response would empty several lines together.
+ */
+export const NO_TRAINS_FAULT_LINES = 2;
 
 /** With Service Closed, this many vehicles or fewer still agrees with the status. */
 export const CLOSED_MAX_VEHICLES = 2;

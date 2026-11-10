@@ -6,6 +6,40 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Wide gaps can now fire on live data. It needed 3 trains per platform inside a 30
+  minute lookahead, which capped every gap at 15 minutes, the threshold itself. The
+  engine now measures the next train wait and the gap after it per platform, takes a
+  missing train as a lower bound, and a test fails if a time threshold exceeds the
+  lookahead.
+- A line losing part of its service can no longer hide in the whole line train count:
+  the new long waits rule flags a line when 30 percent or more of its platforms wait 20
+  minutes or longer.
+- A Good Service line with no trains at all is now a mismatch (no trains) instead of
+  unknown, only when its feed is fresh and empty, it is 07:00 to 22:00 London time, the
+  rest of the network is running and fewer than 2 lines are empty at once. Overnight,
+  closed, planned and feed fault cases stay unknown.
+
+### Changed
+
+- `ArrivalSummary` and the verdict `observed` block gain `longWaitPlatforms`;
+  `platformsMeasured` now counts platforms with at least one train, and `headwaySec` is
+  the median first to second train gap per platform. Summaries stored before this change
+  fail the schema and are skipped until the next refresh.
+
+### Added
+
+- Rule ids `long-waits` and `no-trains`, with titles, a figure and a track in the web app.
+- End to end tests from raw predictions to a verdict for every rule, including overnight,
+  Service Closed, stale, whole feed empty and two lines empty at once.
+
+### Not done
+
+- The time of day baseline. Thresholds are still fixed numbers from one Sunday and one
+  weekday snapshot, and a platform that loses every train disappears from the feed and
+  is not seen. See "Not covered" in `docs/RULES.md`.
+
 ## [0.1.0] - 2026-11-08
 
 First release.

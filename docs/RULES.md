@@ -26,8 +26,9 @@ vehicle id, so trains cannot be counted.
   predictions by `summarise()` in the engine. Fields: `fetchedAt`,
   `vehicles15` (distinct vehicles due within 15 minutes), `vehicles30`,
   `inbound15` and `outbound15` (the same, split by direction where the feed
-  gives one), `headwaySec` (typical gap between trains, see rule 3) and
-  `platformsMeasured`.
+  gives one), `headwaySec` (typical gap between trains, see rule 3),
+  `platformsMeasured` (platforms with at least one train due) and
+  `longWaitPlatforms` (of those, how many wait 20 minutes or more, see rule 4).
 - **now**: injected, never read from a clock inside the engine.
 
 Why vehicles are counted distinctly: one train appears once per upcoming
@@ -43,9 +44,9 @@ plain language `reason`, and `confidence` (`high`, `medium`, `low`).
 
 1. **No usable arrivals** (missing, failed, malformed, empty, or older than 240 s
    at `now`): `unknown`, rule `no-arrivals`, confidence low. An empty feed, or
-   one where no prediction can be tied to a train, cannot tell a quiet line from a
-   broken feed, so it is treated as missing. This is the price of never raising a
-   false alarm: a line with no predictions at all is not flagged.
+   one where no prediction can be tied to a train, cannot on its own tell a quiet
+   line from a broken feed, so it is treated as missing. The one exception is rule
+   5, which lets a fresh, empty feed through under strict conditions.
 2. **Network wide quiet**: if at least 5 lines have fresh summaries and 70
    percent or more of them show fewer than 3 vehicles within 15 minutes, the
    cause is service hours or a feed fault, not any one line. Rules 1 and 3 then
@@ -113,25 +114,103 @@ high confidence.
 
 Official: Good Service or Minor Delays. Observed: trains far apart.
 
-The metric is the **typical headway**: for each platform with at least 3
-predicted vehicles, take the median gap between consecutive vehicles, then take
-the median of those across platforms. Fires `mismatch` when it is 15 minutes
-or more and at least 5 platforms were measured. Confidence: low if fewer than
-10 platforms were measured (this wins over the next one), otherwise high from 25
-minutes, otherwise medium.
+The unit of measurement is the **platform**. For each station and platform, the
+engine takes the distinct trains due inside the 30 minute lookahead and measures
 
-Why the median and not the largest gap: the single largest gap on a healthy
-line reached 21 minutes (Metropolitan), which would raise false alarms. The
-median of medians stayed between 2.5 and 10 minutes on every line (Circle
-highest at 10). 15 leaves a 1.5 times margin over the slowest healthy line.
+- the **wait**: seconds until the next train, and
+- the **gap**: seconds from the next train to the one after it.
+
+A train missing from the window is a lower bound, not a reason to skip. If only
+one train is due, the next one is at least a horizon away, so the gap is taken as
+30 minutes minus the wait. A platform with no train at all does not appear in the
+feed, so it cannot be measured here (see "Not covered" below).
+
+The typical headway is the median gap over platforms. Fires `mismatch` when it
+is 15 minutes or more and at least 5 platforms were measured. Confidence: low if
+fewer than 10 platforms were measured (this wins over the next one), otherwise
+high from 25 minutes, otherwise medium.
+
+This used to need 3 trains per platform inside the 30 minute window, which capped
+every gap at 15 minutes, exactly the threshold, so the rule could never fire on
+live data. Two trains now give a gap of up to 30 minutes. `config.test.ts` fails
+if any time threshold exceeds the lookahead, and `end-to-end.test.ts` drives the
+rule from raw predictions.
+
+Why the median and not the largest gap: a platform with one train due looks like a
+long gap, and up to 12 percent of platforms on healthy lines had a gap of 25
+minutes or more by this measure (Bakerloo 4 of 33, Victoria 2 of 31). The median over
+platforms ignores them. On
+2026-11-08 the median gap was 3 minutes on Victoria, 4 on Bakerloo and 10 on
+Circle. 15 leaves a 1.5 times margin over the slowest.
 
 Example: Piccadilly is Good Service but the typical headway across its
 platforms is 18 minutes. Verdict: mismatch, medium confidence.
 
+## Rule 4: long waits while good (`long-waits`)
+
+Official: Good Service or Minor Delays. Observed: many platforms with no train
+due for a long time.
+
+Counts the platforms whose **wait** (next train) is 20 minutes or more, as a share
+of the platforms measured. Fires `mismatch` when that share is 30 percent or more
+and at least 5 platforms were measured. Confidence: low if fewer than 10 platforms
+were measured, otherwise high from 50 percent, otherwise medium. Checked after
+rule 3, which wins when both apply.
+
+This is what catches a line that loses part of its service while the whole line
+count stays high: a line total adds up trains over every platform, so one half
+running normally hides the other half stranded.
+
+Why 20 minutes and 30 percent: on 2026-11-08 no platform on the four sampled lines
+waited 20 minutes (the longest was 18, on Circle), and 14 percent of Circle's
+waited 15. 30 percent is about twice the worst near miss.
+
+Example: Central is Good Service but 20 of its 40 measured platforms have no train
+due for 20 minutes. Verdict: mismatch, high confidence.
+
+## Rule 5: no trains while good (`no-trains`)
+
+Official: Good Service (every status). Observed: a fresh feed with no predictions
+for the line at all.
+
+Fires `mismatch` only when **all** of these hold, because a silent feed is also
+what an outage or a service gap looks like:
+
+- the line's summary is fresh and its feed held zero predictions (not merely none
+  tied to a train),
+- the time is inside service hours, 07:00 to 22:00 London time (narrower than the
+  published first and last trains on purpose),
+- at least 4 other lines have 3 or more trains due within 15 minutes,
+- the network wide quiet guard is not tripped, and
+- fewer than 2 lines have an empty feed at once. The worker fetches lines in groups,
+  so one empty response would empty several lines together, and two empty lines is
+  treated as a feed fault.
+
+Confidence is always medium: one snapshot cannot rule out a short feed gap.
+Anything else stays `unknown` with rule `no-arrivals`. Overnight, Service Closed,
+planned closures, partial statuses, suspended lines and feed faults therefore
+never raise this alarm.
+
+Example: Central is Good Service at 09:00 but its feed is empty while five other
+lines run. Verdict: mismatch, medium confidence.
+
+## Not covered: the time of day baseline
+
+Rules 3 to 5 compare against fixed thresholds that were chosen from one Sunday
+morning. They do not yet compare a platform with what is normal for that platform
+at that time of day. So:
+
+- a 12 minute wait is the same at 08:00 on a weekday as at 21:00 on a Sunday;
+- a platform that has lost every train disappears from the feed and cannot be seen,
+  so a line losing whole platforms is only caught when enough others show long waits
+  or the line goes entirely silent.
+
+A baseline per platform and time bucket is the next piece of work and is not built.
+
 ## Verdict when no rule fires
 
 `match`, with confidence high unless a metric sits within 25 percent of its
-threshold, then medium.
+threshold, or fewer than 5 platforms were measured, then medium.
 
 ## Where the numbers live
 

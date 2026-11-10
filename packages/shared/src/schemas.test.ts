@@ -27,6 +27,7 @@ const summary = {
   outbound15: 19,
   headwaySec: 360,
   platformsMeasured: 68,
+  longWaitPlatforms: 0,
 };
 
 const verdict = {

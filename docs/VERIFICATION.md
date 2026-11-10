@@ -69,10 +69,116 @@ Run on a local Worker against the real TfL API with real persisted storage:
 | Invalid key and empty storage      | HTTP 503, typed body, `Retry-After: 30`, never a bare 500      |
 | Key in any log, header or response | Never, in any of the above                                     |
 
+## Per platform rules, checked live (2026-11-09)
+
+After the engine changed to measure the wait and gap per platform (rules 3 to 5 in
+`docs/RULES.md`), the new engine was run against the live TfL feed at 15:37 London time
+on a Monday. Official statuses came from TfL's Line Status API, which is the source of
+the public status page, and were compared by eye with
+`tfl.gov.uk/tube-dlr-overground/status/` fetched at the same time. Both showed Central
+and Metropolitan on Minor Delays and every other Tube line on Good Service.
+
+| Line             | Official     | Verdict | Trains in 15 min | Platforms | Long waits | Median gap |
+| ---------------- | ------------ | ------- | ---------------- | --------- | ---------- | ---------- |
+| Bakerloo         | Good Service | in step | 23               | 50        | 0          | 5 min      |
+| Central          | Minor Delays | in step | 57               | 94        | 0          | 5 min      |
+| Circle           | Good Service | in step | 12               | 49        | 0          | 10 min     |
+| District         | Good Service | in step | 55               | 118       | 3          | 5 min      |
+| Hammersmith City | Good Service | in step | 30               | 79        | 6          | 10 min     |
+| Jubilee          | Good Service | in step | 39               | 55        | 0          | 3 min      |
+| Metropolitan     | Minor Delays | in step | 25               | 68        | 1          | 7 min      |
+| Northern         | Good Service | in step | 73               | 109       | 0          | 3 min      |
+| Piccadilly       | Good Service | in step | 55               | 105       | 0          | 5 min      |
+| Victoria         | Good Service | in step | 26               | 32        | 0          | 2 min      |
+| Waterloo & City  | Good Service | in step | 2                | 3         | 0          | 29 min     |
+
+What this shows:
+
+- **No false alarm** on 11 healthy lines on a weekday afternoon. The worst margins were
+  Hammersmith City at 6 of 79 platforms waiting 20 minutes or more (7.6 percent, against
+  a 30 percent bar) and a 10 minute median gap on Hammersmith City and Circle (against
+  15).
+- **Waterloo and City** shows a 29 minute median gap because it has 3 platforms and most show a single
+  train inside the window, so the gap is a lower bound. It has fewer than the 5 platforms needed
+  to trust a gap, so the verdict is "in step" with medium confidence, which is the
+  minimum sample guard doing its job. It is the doubtful case: a two train line is
+  always a small sample.
+- **No new rule fired for real.** Wide gaps, long waits and no trains are proven by
+  end to end tests from raw predictions and by this single live snapshot staying quiet,
+  not by a real disruption. This is one snapshot, not a calibration. The thresholds were
+  set from the Sunday morning data in `docs/RULES.md` and this check is the first
+  weekday data point against them.
+- **Service hours for rule 5 (07:00 to 22:00 London time) are unchecked.** I probed TfL's
+  per station timetable endpoint (`/Line/{id}/Timetable/{stop}`) on 2026-11-09 and it was
+  not quick or reliable enough to trust. It returned data for only 5 of the 11 lines, only
+  for the three stations sampled per line, and the first and last departures were
+  inconsistent (first trains at 12:00 on weekdays, which is wrong, and Sunday last trains
+  between 20:30 and 21:00 at the sampled stations, which looks too early). What it did
+  suggest is that weekday, Friday and Saturday last departures run to about 00:13 to 00:56,
+  well after 22:00. The Sunday evening end is the open question, so a live check at
+  about 21:30 London time on a Sunday is scheduled below. The window is deliberately
+  narrow, so the cost of being wrong at the start or end is a missed alarm, not a false
+  one, except where a line really stops before 22:00 and its status still reads Good
+  Service.
+
+### Scheduled live checks, still to come
+
+Recorded below as each runs, with the rule that fired (if any) and whether it was a real
+problem or a false alarm. Each run uses the same code as the branch and the real feed.
+
+| Label                     | London time                     | Status                                       |
+| ------------------------- | ------------------------------- | -------------------------------------------- |
+| Evening                   | about 19:00, Monday 2026-11-09  | not run, the scheduled job never fired       |
+| Evening (replacement)     | 19:15, Tuesday 2026-11-10       | done, see below                              |
+| Late evening              | about 23:00, Monday 2026-11-09  | not run, the scheduled job never fired       |
+| Early morning             | about 05:30, Tuesday 2026-11-10 | not run, the scheduled job never fired       |
+| Weekend, Saturday daytime | about 11:00, 2026-11-14         | pending, falls after the 2026-11-13 handover |
+| Weekend, Sunday evening   | about 21:30, 2026-11-15         | pending, falls after the 2026-11-13 handover |
+
+The three Monday and Tuesday jobs were session only and did not run, so no result was
+invented for them.
+
+#### Evening, 19:15 London, Tuesday 2026-11-10
+
+| Line             | Official                       | Verdict | Rule                | Trains in 15 min | Platforms | Long waits | Median gap |
+| ---------------- | ------------------------------ | ------- | ------------------- | ---------------- | --------- | ---------- | ---------- |
+| Bakerloo         | Good Service                   | in step | in-step             | 25               | 49        | 0          | 5 min      |
+| Central          | Minor Delays                   | in step | in-step             | 59               | 95        | 0          | 4 min      |
+| Circle           | Good Service                   | in step | in-step             | 12               | 48        | 1          | 7 min      |
+| District         | Severe Delays and Minor Delays | unknown | partial-status      | 51               | 112       | 4          | 5 min      |
+| Hammersmith City | Good Service                   | in step | in-step             | 33               | 83        | 1          | 9 min      |
+| Jubilee          | Minor Delays                   | in step | in-step             | 37               | 55        | 0          | 3 min      |
+| Metropolitan     | Good Service                   | in step | in-step             | 36               | 70        | 2          | 4 min      |
+| Northern         | Minor Delays                   | in step | in-step             | 88               | 113       | 0          | 3 min      |
+| Piccadilly       | Good Service                   | in step | in-step             | 58               | 106       | 0          | 3 min      |
+| Victoria         | Severe Delays                  | unknown | delays-unverifiable | 25               | 30        | 0          | 2 min      |
+| Waterloo & City  | Good Service                   | in step | in-step             | 2                | 2         | 0          | 3 min      |
+
+No rule fired, so there is no real problem or false alarm to classify. This is the first
+snapshot with a real disruption: Victoria on Severe Delays and District on Severe and
+Minor Delays. Drift deliberately says "unknown" for delay statuses it cannot verify from
+arrivals, and it did, rather than guessing. Victoria still showed a 2 minute median gap,
+which is normal service, so the feed does not obviously contradict the status either way.
+
+### CPU cost of the per platform summary
+
+`summarise` and `evaluate` were timed in Node on the four line fixture (469 predictions),
+before and after the change, on a busy Windows laptop, so the figures are noisy:
+
+| Step        | Before                                                              | After                                                       |
+| ----------- | ------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `summarise` | 1.0 to 1.6 microseconds per prediction (0.5 to 0.65 on a quiet run) | 0.9 to 1.2 microseconds per prediction (0.5 on a quiet run) |
+| `evaluate`  | 10 to 19 microseconds per 4 lines                                   | 11 to 15 microseconds per 4 lines                           |
+
+There is no measurable change. At that rate the roughly 4,000 predictions of a full Tube
+refresh cost a few milliseconds in `summarise`, against 25 to 45 ms to parse the JSON,
+which dominates. This is a local Node measurement, not a Cloudflare one: the change was
+not deployed, so no `wrangler tail` CPU figure exists for it yet.
+
 ## Not verified, said plainly
 
 - **No real mismatch was seen.** The network was healthy for the whole session, so none
-  of the three rules fired for real. They are proven by tests and fixtures only.
+  of the rules fired for real. They are proven by tests and fixtures only.
   Whether the verdicts are right during a real disruption of these kinds is untested.
 - **No real suspension was ever seen**, so the flowing while suspended threshold is the
   least proven number.

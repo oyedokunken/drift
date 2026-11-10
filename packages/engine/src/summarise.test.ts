@@ -43,6 +43,7 @@ describe('summarise', () => {
       outbound15: 0,
       headwaySec: null,
       platformsMeasured: 0,
+      longWaitPlatforms: 0,
     });
   });
 
@@ -98,16 +99,21 @@ describe('summarise', () => {
     });
   });
 
-  describe('headway', () => {
-    it('is the median gap at a platform with three trains', () => {
+  describe('per platform waits and gaps', () => {
+    it('measures the gap between the first two trains at a platform', () => {
       const result = summarise('central', platform('s1', [60, 360, 960]), FETCHED_AT);
-      expect(result.headwaySec).toBe(450);
+      expect(result.headwaySec).toBe(300);
       expect(result.platformsMeasured).toBe(1);
     });
 
-    it('needs at least three trains at a platform', () => {
-      const result = summarise('central', platform('s1', [60, 360]), FETCHED_AT);
-      expect(result).toMatchObject({ headwaySec: null, platformsMeasured: 0 });
+    it('takes a lower bound for the gap when only one train is due', () => {
+      const result = summarise('central', platform('s1', [600]), FETCHED_AT);
+      expect(result).toMatchObject({ headwaySec: 1200, platformsMeasured: 1 });
+    });
+
+    it('measures a platform with a single train due right now as a 30 minute gap', () => {
+      const result = summarise('central', platform('s1', [0]), FETCHED_AT);
+      expect(result.headwaySec).toBe(1800);
     });
 
     it('takes the median across platforms, not the largest gap', () => {
@@ -144,6 +150,20 @@ describe('summarise', () => {
       ];
       expect(summarise('central', rows, FETCHED_AT).platformsMeasured).toBe(2);
     });
+
+    it.each([
+      ['one second under the long wait', 1199, 0],
+      ['exactly the long wait', 1200, 1],
+      ['the edge of the horizon', 1800, 1],
+    ])('counts a long waiting platform: %s', (_name, wait, expected) => {
+      const result = summarise('central', platform('s1', [wait]), FETCHED_AT);
+      expect(result.longWaitPlatforms).toBe(expected);
+    });
+
+    it('judges a platform by its next train, not by later ones', () => {
+      const result = summarise('central', platform('s1', [60, 1500]), FETCHED_AT);
+      expect(result.longWaitPlatforms).toBe(0);
+    });
   });
 
   describe('on real captured data (Sunday morning, 2026-11-08)', () => {
@@ -163,9 +183,9 @@ describe('summarise', () => {
       expect(result.headwaySec).toBeLessThanOrEqual(240);
     });
 
-    it('Waterloo and City: two trains and too little data for a headway', () => {
+    it('Waterloo and City: two trains, one at each of two platforms', () => {
       const result = summarise('waterloo-city', rowsFor('waterloo-city'), FETCHED_AT);
-      expect(result).toMatchObject({ vehicles15: 2, headwaySec: null });
+      expect(result).toMatchObject({ vehicles15: 2, platformsMeasured: 2 });
     });
   });
 });

@@ -28,6 +28,7 @@ function summary(
     outbound15: 10,
     headwaySec: 300,
     platformsMeasured: 20,
+    longWaitPlatforms: 0,
     ...overrides,
   };
 }
