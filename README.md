@@ -288,10 +288,11 @@ Said plainly, so nothing here is a surprise.
   parallel calls and was retried). It finished on its own and nothing broke, but a visitor
   in that window saw an empty page. A deploy that changes the summary shape will do this
   again.
-- **Only weekday evening bands have been checked live** (19:57 and 21:06 London time). No
-  late night, morning or weekend band has run, so the night routes and the Sunday windows
-  are unproven. Late night and morning checks are scheduled and will be recorded in
-  `docs/VERIFICATION.md`.
+- **Only weekday evening and morning rush hour bands have been checked live** (19:57,
+  21:06 and 08:18 London time). No late night, early morning or weekend band has run, so the
+  night routes, the start of service and the Sunday windows are unproven. The scheduled late
+  night and 05:30 checks did not run at their times, and the weekend checks are still
+  scheduled and will be recorded in `docs/VERIFICATION.md`.
 - **Lighthouse performance is 93 against 98 for 0.1.0.** The three runs scored 93, 97 and
   90, which is within the noise of a busy laptop, so the drop is not shown to be real.
 - **No real disruption has fired any new rule.** Overground lines were on Severe and
