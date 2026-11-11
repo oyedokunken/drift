@@ -64,7 +64,8 @@ const TEXT_PAIRS: readonly (readonly [string, string, string])[] = [
   [token('blue-200'), token('blue-900'), 'labels, hero count and links on deep blue'],
   [token('blue-900'), token('white'), 'Drift detected pill and chip on a card'],
   [token('ink'), token('blue-200'), 'banner and sample banner text'],
-  [token('blue-900'), token('wash'), 'bus route error message on the page wash'],
+  [token('error'), token('wash'), 'bus route error message on the page wash'],
+  [token('grey-500'), token('white'), 'placeholder text in the bus route input'],
   [token('white'), PILL_WORST_CASE, 'freshness pill at its lightest'],
   [token('blue-200'), FOOTER_MARK_WORST_CASE, 'footer links over the faint mark'],
   [token('white'), FOOTER_MARK_WORST_CASE, 'footer text over the faint mark'],
@@ -83,6 +84,7 @@ const SHAPE_PAIRS: readonly (readonly [string, string, string])[] = [
   [token('white'), token('blue-900'), 'threshold tick on a mismatch card'],
   [token('blue-900'), token('white'), 'drift icon disc on its white pill'],
   [token('grey-500'), token('white'), 'outline of the bus route input'],
+  [token('error'), token('white'), 'invalid bus route input outline'],
 ];
 
 describe('palette contrast', () => {

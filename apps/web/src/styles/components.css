@@ -518,18 +518,18 @@
   text-transform: uppercase;
 }
 
+.bus-form__input::placeholder {
+  color: var(--grey-500);
+  opacity: 1;
+}
+
 .bus-form__input[aria-invalid='true'] {
-  border-color: var(--blue-900);
+  border-color: var(--error);
   border-width: 2px;
 }
 
-.bus-form__hint {
-  color: var(--text-muted);
-  font-size: var(--step--1);
-}
-
 .bus-form__error {
-  color: var(--blue-900);
+  color: var(--error);
   font-weight: 700;
 }
 
