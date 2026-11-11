@@ -292,9 +292,65 @@ problem or a false alarm.** Two things worth noting. Route 490 was 9 minutes apa
 and 15 here, and the bus rule correctly stopped judging it as it became infrequent. Mildmay's
 severe delays had cleared to minor delays, and it is in step.
 
-Status of the bands: band 1 (19:57) and band 2 (21:06) done, both on a weekday evening. No
-late night, morning or weekend band has run, so the night routes and the Sunday windows are
-still unproven.
+### Morning: 08:18 London, Wednesday 2026-11-11
+
+This was meant to be two checks, a late night one at about 23:40 and a morning one at about
+05:30. Both scheduled jobs only fired at 08:18, because the session that held them was not
+running at those times. So neither slot was checked and the night routes were not seen
+running. What was run is one check at 08:18, which is a new band: the morning rush hour.
+
+| Line             | Mode           | Official                         | Verdict | Rule           | Platforms | Long waits | Median gap |
+| ---------------- | -------------- | -------------------------------- | ------- | -------------- | --------- | ---------- | ---------- |
+| Bakerloo         | tube           | Good Service                     | in step | in-step        | 50        | 0          | 5 min      |
+| Central          | tube           | Minor Delays                     | in step | in-step        | 91        | 0          | 3 min      |
+| Circle           | tube           | Good Service                     | in step | in-step        | 46        | 0          | 9 min      |
+| District         | tube           | Minor Delays                     | in step | in-step        | 107       | 2          | 4 min      |
+| DLR              | dlr            | Good Service                     | in step | in-step        | 98        | 0          | 5 min      |
+| Elizabeth line   | elizabeth-line | Severe Delays and Part Suspended | unknown | partial-status | 100       | 5          | 5 min      |
+| Hammersmith City | tube           | Good Service                     | in step | in-step        | 86        | 5          | 8 min      |
+| Jubilee          | tube           | Good Service                     | in step | in-step        | 56        | 0          | 2 min      |
+| Liberty          | overground     | Good Service                     | unknown | not-measurable | 3         | 0          | 17 min     |
+| Lioness          | overground     | Good Service                     | unknown | not-measurable | 37        | 1          | 15 min     |
+| Metropolitan     | tube           | Minor Delays                     | in step | in-step        | 71        | 3          | 8 min      |
+| Mildmay          | overground     | Good Service                     | in step | in-step        | 58        | 2          | 7 min      |
+| Northern         | tube           | Minor Delays                     | in step | in-step        | 113       | 0          | 2 min      |
+| Piccadilly       | tube           | Good Service                     | in step | in-step        | 106       | 0          | 5 min      |
+| Suffragette      | overground     | Minor Delays                     | unknown | not-measurable | 25        | 0          | 15 min     |
+| Victoria         | tube           | Good Service                     | in step | in-step        | 32        | 0          | 2 min      |
+| Waterloo & City  | tube           | Good Service                     | in step | in-step        | 4         | 0          | 2 min      |
+| Weaver           | overground     | Good Service                     | unknown | not-measurable | 53        | 5          | 11 min     |
+| Windrush         | overground     | Good Service                     | in step | in-step        | 56        | 0          | 9 min      |
+
+| Route | Official                | Verdict | Rule           | Stops | Long waits | Median gap | Why                                         |
+| ----- | ----------------------- | ------- | -------------- | ----- | ---------- | ---------- | ------------------------------------------- |
+| 207   | Good Service            | in step | in-step        | 90    | 0          | 6 min      | A very frequent route                       |
+| 73    | Good Service            | in step | in-step        | 63    | 0          | 6 min      | A frequent route                            |
+| 490   | Good Service            | in step | in-step        | 82    | 2          | 7 min      | Frequent again, 15 minutes apart last night |
+| 18    | Special Service         | unknown | partial-status | 93    | 0          | 4 min      | Special Service is a partial status         |
+| N207  | Good Service            | unknown | not-measurable | 0     | 0          | none       | A night route, over for the morning         |
+| N18   | Special Service (twice) | unknown | partial-status | 0     | 0          | none       | A night route, over for the morning         |
+
+**No rule fired on 19 lines or 6 bus routes, so there is nothing to classify as a real
+problem or a false alarm.** What the run shows:
+
+- **A real disruption was on the network and Drift handled it as designed.** The Elizabeth
+  line was on Severe Delays and Part Suspended, and TfL's status page, fetched a few minutes
+  later, said the same: no service between Paddington and Reading or Heathrow while
+  emergency services dealt with a casualty on the track, and severe delays between
+  Paddington and Abbey Wood. Drift reads a partial status as unknown, low confidence, so it
+  did not call a mismatch. The counts agree with the disruption: 5 of 100 platforms
+  waiting 20 minutes or more, against 2 of 91 in the evening.
+- **Suffragette** was on Minor Delays (the page: an earlier late finish of engineering work)
+  and, as an Overground line, is judged only on no trains, so it reads not enough data.
+- Central, District, Metropolitan and Northern were on Minor Delays and in step, as the
+  page said.
+- This is the first band with the Tube at the morning peak (1.9 to 3 minute median gaps on
+  the busiest lines), and the weekday window was open for every mode.
+
+Status of the bands: band 1 (19:57), band 2 (21:06) and the morning rush hour (08:18) are
+done. The late night and 05:30 slots were missed, so the night routes and the start of
+service are unchecked, and no weekend band has run, so the Sunday windows are still
+unproven.
 
 ### The Worker run locally with real storage (2026-11-10, 20:09 to 20:15 London)
 
