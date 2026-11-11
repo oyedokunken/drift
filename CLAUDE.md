@@ -91,6 +91,9 @@ scripts/          Brand asset generation (SVG to PNG and ICO).
 - Tokens live in one CSS file as custom properties. Blues: `#0B2A6F`,
   `#2563EB`, `#BFD7FF`. Neutrals: white, `#0A0B0F`, `#F5F6F8`, `#E3E6EB`,
   `#6B7280`, `#374151`. Keep WCAG AA and verify it.
+  One exception outside the blues and neutrals: `--error`, `#B42318`, a red used only
+  for form error text and the invalid input outline. Nothing else uses it, and its
+  contrast on the page wash and on white is checked in `tokens.test.ts`.
 - Surfaces use the same palette: deep blue masthead, cards and footer, a page wash
   that is a tint of `#BFD7FF` on white (`--wash`, `--panel-soft`). Every text pair,
   including translucent layers at their lightest, is checked in `tokens.test.ts`.

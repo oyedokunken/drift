@@ -96,7 +96,7 @@ async function openSearch(search = '') {
 }
 
 describe('bus search form', () => {
-  it('has a label, a hint and no native validation', async () => {
+  it('has a label, the example as a placeholder, and no native validation', async () => {
     stubFetch(() => ok(RESULT));
     const { region, input } = await openSearch();
     const form = region.querySelector('form');
@@ -112,7 +112,8 @@ describe('bus search form', () => {
       expect(input).not.toHaveAttribute(attribute);
     }
     expect(input).not.toHaveAttribute('type', 'number');
-    expect(input).toHaveAccessibleDescription('For example 207 or W11.');
+    expect(input).toHaveAttribute('placeholder', 'For example 207 or W11');
+    expect(region).not.toHaveTextContent('For example 207 or W11.');
   });
 
   it('starts idle: nothing is checked until someone asks', async () => {

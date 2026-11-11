@@ -91,7 +91,6 @@ export function BusSearch({ initialRoute }: { readonly initialRoute: string | nu
   const { state, submit } = useBusSearch(initialRoute);
   const [input, setInput] = useState(initialRoute ?? '');
   const id = useId();
-  const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
   const invalid = state.phase === 'invalid';
 
@@ -122,7 +121,8 @@ export function BusSearch({ initialRoute }: { readonly initialRoute: string | nu
             autoCapitalize="characters"
             spellCheck={false}
             value={input}
-            aria-describedby={invalid ? `${hintId} ${errorId}` : hintId}
+            placeholder="For example 207 or W11"
+            aria-describedby={invalid ? errorId : undefined}
             aria-invalid={invalid}
             onChange={(event) => {
               setInput(event.target.value);
@@ -132,9 +132,6 @@ export function BusSearch({ initialRoute }: { readonly initialRoute: string | nu
             Check route
           </button>
         </div>
-        <p id={hintId} className="bus-form__hint">
-          For example 207 or W11.
-        </p>
         {state.phase === 'invalid' && (
           <p id={errorId} className="bus-form__error">
             {state.message}

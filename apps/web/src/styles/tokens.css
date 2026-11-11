@@ -1,6 +1,8 @@
 /*
- * Design tokens. The palette is three blues plus white, black and grey. Pairs used for
- * text are checked against WCAG AA by src/styles/tokens.test.ts.
+ * Design tokens. The palette is three blues plus white, black and grey, with one
+ * exception: --error, a red used only for form error text and the invalid input outline.
+ * Nothing else may use it. Pairs used for text are checked against WCAG AA by
+ * src/styles/tokens.test.ts.
  */
 :root {
   /* Palette */
@@ -13,6 +15,9 @@
   --grey-200: #e3e6eb;
   --grey-500: #6b7280;
   --grey-700: #374151;
+
+  /* The one colour outside the blues, for form errors only */
+  --error: #b42318;
 
   /* Tints of --blue-200 on white, for the page and for soft panels */
   --wash: #eff5ff;
