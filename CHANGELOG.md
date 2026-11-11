@@ -11,6 +11,8 @@ All notable changes to this project are documented here. The format follows
 - The bus route example ("For example 207 or W11") is the input's placeholder and no
   longer a line of text under the form.
 - Bus form errors are red: red error text and a red outline on the invalid input.
+- The placeholder keeps its normal case and the input takes its own row on a 375px screen,
+  so the placeholder is no longer upper cased or cut off.
 
 ### Added
 
