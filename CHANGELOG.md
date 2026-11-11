@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-11-11
+
+### Changed
+
+- The bus route example ("For example 207 or W11") is the input's placeholder and no
+  longer a line of text under the form.
+- Bus form errors are red: red error text and a red outline on the invalid input.
+
+### Added
+
+- One colour token outside the blues, `--error` (`#B42318`), for form errors only. It is
+  documented as an exception in `CLAUDE.md` and in `tokens.css`, and its contrast on the
+  page wash and on white is checked in `tokens.test.ts`. A test fails if another colour
+  token is added.
+
+### Not done
+
+- Nothing else changed. The weekend live checks are still scheduled, and the Sunday
+  windows are still unproven.
+
 ## [0.2.0] - 2026-11-10
 
 ### What changed in this release
