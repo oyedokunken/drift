@@ -126,14 +126,15 @@ What this shows:
 Recorded below as each runs, with the rule that fired (if any) and whether it was a real
 problem or a false alarm. Each run uses the same code as the branch and the real feed.
 
-| Label                     | London time                     | Status                                       |
-| ------------------------- | ------------------------------- | -------------------------------------------- |
-| Evening                   | about 19:00, Monday 2026-11-09  | not run, the scheduled job never fired       |
-| Evening (replacement)     | 19:15, Tuesday 2026-11-10       | done, see below                              |
-| Late evening              | about 23:00, Monday 2026-11-09  | not run, the scheduled job never fired       |
-| Early morning             | about 05:30, Tuesday 2026-11-10 | not run, the scheduled job never fired       |
-| Weekend, Saturday daytime | about 11:00, 2026-11-14         | pending, falls after the 2026-11-13 handover |
-| Weekend, Sunday evening   | about 21:30, 2026-11-15         | pending, falls after the 2026-11-13 handover |
+| Label                     | London time                     | Status                                 |
+| ------------------------- | ------------------------------- | -------------------------------------- |
+| Evening                   | about 19:00, Monday 2026-11-09  | not run, the scheduled job never fired |
+| Evening (replacement)     | 19:15, Tuesday 2026-11-10       | done, see below                        |
+| Late evening              | about 23:00, Monday 2026-11-09  | not run, the scheduled job never fired |
+| Early morning             | about 05:30, Tuesday 2026-11-10 | not run, the scheduled job never fired |
+| Weekend, Saturday daytime | about 11:00, 2026-11-14         | not run at the time, still to do       |
+| Weekend, Sunday evening   | about 21:30, 2026-11-15         | not run at the time, still to do       |
+| Weekday late morning      | 11:40, Friday 2026-11-27        | done, see below                        |
 
 The three Monday and Tuesday jobs were session only and did not run, so no result was
 invented for them.
@@ -437,13 +438,38 @@ Median: Performance 93, Accessibility 100, Best Practices 100, SEO 100. 0.1.0 sc
 Performance on 2026-11-08. The difference is within the spread of these three runs, so it
 is not shown to be real, but it is not shown to be nothing either.
 
+## A live check on a disrupted Friday (2026-11-27, 11:40 London)
+
+Run by hand, from my machine, against the deployed site's public `/api/snapshot`. No key was
+used and nothing ran in GitHub. It is a weekday band, so it is not one of the weekend checks.
+
+- **Timing:** the snapshot answered 200 in 2.5 s and 5.8 s on two calls, and the page
+  answered 200 in 0.7 s. `stale` was false, with the arrivals 78 seconds older than the
+  snapshot, which is the normal lag between a poll and a request.
+- **Verdicts:** 19 lines. 6 in step, 13 unknown, 0 mismatches. The unknowns were 5
+  partial statuses, 4 Severe Delays and 4 Overground lines with too few trains to judge.
+- **The network was disrupted:** TfL showed Severe Delays and Part Suspended on Bakerloo,
+  Central, Circle, Metropolitan and Piccadilly, Severe Delays on District, Hammersmith and
+  City, Northern and Victoria, and Suspended on Waterloo and City.
+- **Waterloo and City, Suspended:** Drift read one train due on one platform and called it
+  in step ("only 1 train is due, as expected"). This is the first real suspension I have
+  seen. It confirms the quiet side of the flowing while suspended rule, that a suspended
+  line with almost no trains is not a mismatch. It does not test the firing side, because
+  no suspended line was running trains.
+- **No false alarm** on a day when most of the Tube was disrupted, which is the result I
+  care about most. Drift stayed unknown wherever the official status could not be
+  confirmed or contradicted by train counts.
+- **Not learned:** whether a real mismatch is caught. None appeared.
+
 ## Not verified, said plainly
 
 - **No real mismatch was seen.** The network was healthy for the whole session, so none
-  of the rules fired for real. They are proven by tests and fixtures only.
+  of the rules fired for real. The 2026-11-27 check above found a disrupted network and
+  still no mismatch. They are proven by tests and fixtures only.
   Whether the verdicts are right during a real disruption of these kinds is untested.
-- **No real suspension was ever seen**, so the flowing while suspended threshold is the
-  least proven number.
+- **No real suspension was running trains**, so the flowing while suspended threshold is
+  the least proven number. One suspension was seen on 2026-11-27 (Waterloo and City) and
+  it was in step.
 - **Weekday peak and overnight** were not observed. Everything here is a Sunday
   morning to early afternoon.
 - **The outage test was not run on the production site, by decision.** It would have

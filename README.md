@@ -5,9 +5,9 @@
 
 **Where the official status and the real network drift apart.**
 
-Drift is a live page that checks whether Transport for London's official line
-status matches what the trains and buses are actually doing, for the Tube, the
-Elizabeth line, the DLR, the Overground and any bus route you search for. TfL says a line has Good Service,
+I built Drift to check whether Transport for London's official line status matches
+what the trains and buses are actually doing, for the Tube, the Elizabeth line, the
+DLR, the Overground and any bus route you search for. TfL says a line has Good Service.
 Drift looks at the live train predictions, and if the two disagree it says so, with
 the rule that fired, a plain reason and how confident it is.
 
@@ -15,36 +15,36 @@ the rule that fired, a plain reason and how confident it is.
 | ----------------------------------------------------- | -------------------------------------------------------- |
 | ![Drift on a phone](docs/screenshots/live-mobile.png) | ![Drift on a desktop](docs/screenshots/live-desktop.png) |
 
-The images above are the real live site, with the network healthy. The mismatch design
-is shown in sample mode:
+The images above are the real live site, with the network healthy. I show the mismatch
+design in sample mode:
 
 | Sample mode, 375px                                            | Sample mode, 1280px                                             |
 | ------------------------------------------------------------- | --------------------------------------------------------------- |
 | ![Mismatch cards at 375px](docs/screenshots/mismatch-375.png) | ![Mismatch cards at 1280px](docs/screenshots/mismatch-1280.png) |
 
-The sample images come from `/?sample=1`: open `/?sample=1` to see the mismatch design built from
+The sample images come from `/?sample=1`. Open it to see the mismatch design built from
 fixture data by the real engine, under a persistent "Sample data, not live" banner. It
 only turns on for that exact query parameter and makes no network request. No real
-mismatch has appeared in the hours Drift has been watched (see
-[How it was verified](#how-it-was-verified)), so this is how the design is reviewed.
+mismatch has appeared in the hours I have watched Drift (see
+[How it was verified](#how-it-was-verified)), so this is how I review the design.
 
 ## What changed
 
-Version 0.2.0 extends Drift beyond the Tube.
+Version 0.2.0 extends Drift beyond the Tube. I added:
 
-- **Elizabeth line, DLR and Overground** are checked, with a rule set per mode and a mode
-  switch in the page. Rules that cannot be trusted on a mode are off, and a line too
+- **Elizabeth line, DLR and Overground checks**, with a rule set per mode and a mode
+  switch in the page. I turned off any rule I could not trust on a mode, and a line too
   infrequent to judge says "not enough data". See [docs/RULES.md](docs/RULES.md).
-- **Bus routes** are checked when you search (or open `?bus=207`), behind a cache and a
+- **Bus route checks** when you search (or open `?bus=207`), behind a cache and a
   request budget that keeps the key under TfL's limit.
-- **The no trains rule is safer on a Sunday**, with a narrow provisional window.
-- **Not done or not proven:** see [Not finished](#not-finished).
+- **A safer no trains rule on a Sunday**, with a narrow provisional window.
+- **What is not done or not proven** is in [Not finished](#not-finished).
 
 ## Why
 
-An official status is a statement, not a measurement. Drift compares the statement
-with the evidence: how many trains are due soon, in which directions, and how far
-apart they are. A false alarm is worse than a missed one, so whenever the evidence is
+An official status is a statement, not a measurement. I wanted to compare the
+statement with the evidence: how many trains are due soon, in which directions, and how
+far apart they are. A false alarm is worse than a missed one, so whenever the evidence is
 thin, missing or ambiguous, Drift says "not enough data" rather than guessing.
 
 ## How it works
@@ -69,36 +69,35 @@ flowchart TB
   store -. "cold start: empty store runs one refresh" .-> arrivals
 ```
 
-One Cloudflare Worker serves the web app and the API, so there is one deploy, one
-URL and no CORS. The interesting constraint is TfL's arrivals feed: 3 to 4 MB, and
-about 25 to 45 ms of CPU just to parse, against a documented free tier limit of 10 ms.
-So the heavy parsing happens off the request path, inside a Durable Object driven by
+I serve the web app and the API from one Cloudflare Worker, so there is one deploy, one
+URL and no CORS. The constraint that shaped the design is TfL's arrivals feed: 3 to 4 MB,
+and about 25 to 45 ms of CPU just to parse, against a documented free tier limit of 10 ms.
+So I keep the heavy parsing off the request path, inside a Durable Object driven by
 a once a minute cron trigger, which reduces each line to a tiny summary. The request
 handler only reads the 13 KB status feed and those summaries. The full reasoning, with
 the measurements, is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-Resilience: every upstream call has a timeout, retries with exponential backoff and
-jitter (honouring `Retry-After`), concurrent requests share one in flight build, a
-short cache keeps TfL traffic independent of visitor count, and if TfL is down the
-Worker serves the last good snapshot marked stale, or a typed 503 if there is none.
-It never returns a bare 500.
+For resilience, every upstream call has a timeout and retries with exponential backoff
+and jitter (honouring `Retry-After`). Concurrent requests share one in flight build, and
+a short cache keeps TfL traffic independent of visitor count. If TfL is down, the Worker
+serves the last good snapshot marked stale, or a typed 503 if there is none. It never
+returns a bare 500.
 
-Cold start: if the store holds no line summaries, as on empty storage, the first
-request runs one refresh itself instead of waiting for the next cron tick. Concurrent
-requests share that refresh, it is capped at 7 seconds, and if it fails the page still
-gets a valid snapshot with those lines marked "not enough data". With 19 lines the cap can
-be too short on completely empty storage: on a local Worker the Elizabeth line alone took
-about 4.5 seconds to download, the cold refresh timed out and the page said "not enough
-data" until the refresh finished in the background and the 45 second snapshot cache
-expired. A deploy to the existing live storage is not affected, because the summaries are
-already there. If TfL's status feed is
-down and nothing has ever been stored, the Worker still answers with the typed 503.
+On a cold start, when the store holds no line summaries, the first request runs one
+refresh itself instead of waiting for the next cron tick. Concurrent requests share that
+refresh, I capped it at 7 seconds, and if it fails the page still gets a valid snapshot
+with those lines marked "not enough data". With 19 lines I found the cap can be too short
+on completely empty storage: on a local Worker the Elizabeth line alone took about 4.5
+seconds to download, the cold refresh timed out and the page said "not enough data" until
+the refresh finished in the background and the 45 second snapshot cache expired. A deploy
+to the existing live storage is not affected, because the summaries are already there. If
+TfL's status feed is down and nothing has ever been stored, the Worker still answers with
+the typed 503.
 
-One live incident is not explained. Shortly after a deploy, the site showed "Live data is
-unavailable" with no earlier snapshot. By the time it was investigated, the API was
-healthy and the logs showed no errors, so the cause was **not proven**. The cold start
-gap above is the likeliest explanation and is now closed, but that is an inference, not a
-finding.
+One live incident I cannot explain. Shortly after a deploy, the site showed "Live data is
+unavailable" with no earlier snapshot. By the time I looked, the API was healthy and the
+logs showed no errors, so I did **not prove** the cause. The cold start gap above is the
+likeliest explanation and I have closed it, but that is an inference, not a finding.
 
 ## The rules
 
@@ -120,16 +119,16 @@ The table of which is in [docs/RULES.md](docs/RULES.md#rules-by-mode).
 
 Wide gaps and long waits work per platform (the next train wait and the gap after it),
 not on a whole line count, so a line losing part of its service cannot hide behind busy
-platforms. Wide gaps used to be unreachable on live data and was fixed after review;
-the history is in the [changelog](CHANGELOG.md).
+platforms. My first wide gaps rule was unreachable on live data. Review caught it and I
+fixed it; the history is in the [changelog](CHANGELOG.md).
 
 Partial closures, planned works, Severe Delays and missing data never produce a
 mismatch. They resolve to "unknown". A network wide quiet guard stops a feed fault or
 the end of service hours from looking like every line failing at once. The no trains
 rule only runs inside a provisional service window per day type (weekday 07:00 to
-22:00, Saturday 08:00 to 21:30, Sunday 09:00 to 19:30, London time). They are
-provisional because the Sunday evening end is unverified, so Sunday is narrow on
-purpose; outside the window the answer is "unknown".
+22:00, Saturday 08:00 to 21:30, Sunday 09:00 to 19:30, London time). I have not
+verified the Sunday evening end, so I made Sunday narrow on purpose; outside the window
+the answer is "unknown".
 
 ### The new modes and bus search, live
 
@@ -141,7 +140,7 @@ purpose; outside the window the answer is "unknown".
 | --------------------------------------------------------- | ------------------------------------------------------ |
 | ![Mode switch at 1280px](docs/screenshots/modes-1280.png) | ![Bus search at 1280px](docs/screenshots/bus-1280.png) |
 
-These four are the real live site on 2026-11-10 after the 0.2.0 deploy.
+These four are the real live site on 2026-11-10, after I deployed 0.2.0.
 
 ## Run it locally
 
@@ -178,7 +177,7 @@ then renders the PNG, ICO and Open Graph files into `apps/web/public/`.
 
 ## Testing
 
-729 tests across 30 files, run on every push. Coverage overall is 97.5 percent of
+732 tests across 30 files, run on every push. Coverage overall is 97.5 percent of
 statements and 94.5 percent of branches, with thresholds enforced in CI (engine, shared
 and Worker at 90 percent or more).
 
@@ -216,17 +215,17 @@ trigger. Cloudflare can take around ten minutes to start a new cron trigger.
 
 See [docs/VERIFICATION.md](docs/VERIFICATION.md) for the dated record. In short:
 
-- The `official` column was compared with TfL's own public status page at several
-  times and matched every time.
-- Train counts were recomputed independently from TfL's raw arrivals feed with
-  separate code and agreed with Drift's live numbers to within a few trains on lines
+- I compared the `official` column with TfL's own public status page at several
+  times and it matched every time.
+- I recomputed train counts independently from TfL's raw arrivals feed with separate
+  code, and they agreed with Drift's live numbers to within a few trains on lines
   carrying 11 to 73.
 - A background sampler recorded every line every ten minutes for the whole session, with
   four spaced raw snapshots kept for the headway rule. No healthy line came close to a
   threshold: the fewest trains due in 15 minutes was 9 (Circle) against a floor of 3, the
   quietest direction on any line still had 5 trains, and the slowest typical headway was
   9.8 minutes (Circle) against a bar of 15.
-- The outage behaviour was exercised against the real TfL API on a local Worker with
+- I exercised the outage behaviour against the real TfL API on a local Worker with
   real persisted storage: success, a stale fallback when TfL rejected the key, and a
   typed 503 with empty storage. The key appeared in no log or response.
 - Lighthouse on the deployed site, mobile profile, median of three runs: **Performance
@@ -242,70 +241,72 @@ load is about 190 KB including the self hosted font.
 
 ## Deviations from the plan
 
-The plan sent before building described a cron split by line and KV storage. Three
-things changed once the real numbers were in.
+The plan I sent before building described a cron split by line and KV storage. Three
+things changed once I had the real numbers.
 
-- **KV became a Durable Object.** Workers KV allows 1,000 writes a day on the free
-  plan, and the refresh writes every minute, so KV could not hold the state.
-- **One cron trigger with five parallel fetches replaced the per line cron split.** A
-  deployed measurement showed the Durable Object has far more CPU headroom than a plain
-  handler, so one trigger now drives five parallel TfL fetches inside it. That is
-  simpler, and one failing group still leaves the other lines fresh.
-- **`domMax` replaced `domAnimation`.** The brief asks for both a small bundle and a
-  layout animation when lines reorder, but layout animation only exists in `domMax`.
-  It loads lazily after first paint, so the initial bundle stays small.
+- **I replaced KV with a Durable Object.** Workers KV allows 1,000 writes a day on the
+  free plan, and the refresh writes every minute, so KV could not hold the state.
+- **I replaced the per line cron split with one cron trigger and five parallel
+  fetches.** A deployed measurement showed the Durable Object has far more CPU headroom
+  than a plain handler, so one trigger now drives five parallel TfL fetches inside it.
+  That is simpler, and one failing group still leaves the other lines fresh.
+- **I used `domMax` instead of `domAnimation`.** The brief asks for both a small bundle
+  and a layout animation when lines reorder, but layout animation only exists in
+  `domMax`. It loads lazily after first paint, so the initial bundle stays small.
 
 ## Not finished
 
 Said plainly, so nothing here is a surprise.
 
-- **The time of day baseline is not built.** The rules compare against fixed
+- **I have not built the time of day baseline.** My rules compare against fixed
   thresholds, not against what is normal for a platform at that hour. A platform that
   loses every train drops out of the feed and cannot be seen, so a line losing whole
   platforms is caught only when enough others show long waits or the line goes silent.
   This is the next piece of work.
-- **No real mismatch has been observed.** In the hours Drift was watched the network
-  was healthy, so every verdict was "in step" or "unknown". The five rules are proven
-  by tests and fixtures, not by a real disruption. Rule 2 in particular (flowing while
-  suspended) has never been seen against a real suspension.
-- **Thresholds are calibrated on one day**, a Sunday from morning to early afternoon.
-  Weekday peak and overnight behaviour have not been measured, and the numbers may need
+- **I have not seen a real mismatch.** Most of the hours I watched Drift the network was
+  healthy. On 2026-11-27 at 11:40 London the Tube was heavily disrupted and Drift still
+  raised no mismatch: 6 lines in step, 13 unknown. The rules are proven by tests and
+  fixtures, not by a real mismatch. Rule 2 in particular (flowing while suspended) has
+  been seen only on the quiet side: Waterloo and City was suspended with one train due,
+  and Drift called it in step. No suspended line was running trains.
+- **I calibrated the thresholds on one day**, a Sunday from morning to early afternoon.
+  I have not measured weekday peak and overnight behaviour, and the numbers may need
   adjusting.
 - **Severe Delays always resolves to unknown.** Delayed trains still run, so train
   counts cannot contradict it. A deliberate cut, not an oversight.
 - **The service windows are provisional.** Weekday 07:00 to 22:00, Saturday 08:00 to
   21:30, Sunday 09:00 to 19:30 (London time). A timetable probe on 2026-11-09 was
-  unreliable and no Sunday evening check has run, so Sunday is narrow on purpose. A wrong
-  window costs a missed alarm, never a false one.
-- **Bus checks used up to 16 ms of CPU against a documented 10 ms.** Measured with
+  unreliable and I have not run a Sunday evening check, so I kept Sunday narrow on
+  purpose. A wrong window costs a missed alarm, never a false one.
+- **Bus checks used up to 16 ms of CPU against a documented 10 ms.** I measured this with
   `wrangler tail` after the deploy (a fetched route 4 to 16 ms). They run in the Durable
   Object, whose documented limit is far higher, and nothing was stopped, but that is an
   observation and not a guarantee. The refresh costs 63 to 103 ms a tick, about the same as
   0.1.0 did for the Tube alone (75 ms).
-- **Right after the deploy every line read "not enough data" for about 70 seconds.** The
-  summaries stored by 0.1.0 lack a new field and are skipped until the next cron ticks, and
-  the cold start refresh has a 7 second cap that 19 lines can exceed (TfL timed out on some
-  parallel calls and was retried). It finished on its own and nothing broke, but a visitor
-  in that window saw an empty page. A deploy that changes the summary shape will do this
-  again.
-- **Only weekday evening and morning rush hour bands have been checked live** (19:57,
-  21:06 and 08:18 London time). No late night, early morning or weekend band has run, so the
-  night routes, the start of service and the Sunday windows are unproven. The scheduled late
-  night and 05:30 checks did not run at their times, and the weekend checks are still
-  scheduled and will be recorded in `docs/VERIFICATION.md`.
+- **Right after the 0.2.0 deploy every line read "not enough data" for about 70 seconds.**
+  The summaries stored by 0.1.0 lack a new field and are skipped until the next cron
+  ticks, and the cold start refresh has a 7 second cap that 19 lines can exceed (TfL timed
+  out on some parallel calls and was retried). It finished on its own and nothing broke,
+  but a visitor in that window saw an empty page. A deploy that changes the summary shape
+  will do this again.
+- **I have only checked weekday bands live**: 19:57, 21:06, 08:18 and 11:40 London time. No
+  late night, early morning or weekend band has run, so the night routes, the start of
+  service and the Sunday windows are unproven. My scheduled late
+  night and 05:30 checks did not run at their times, and I have not yet run the weekend
+  checks. I will record them in `docs/VERIFICATION.md` when I do.
 - **Lighthouse performance is 93 against 98 for 0.1.0.** The three runs scored 93, 97 and
   90, which is within the noise of a busy laptop, so the drop is not shown to be real.
 - **No real disruption has fired any new rule.** Overground lines were on Severe and
-  Minor Delays and a Part Closure during the checks, which resolve to "unknown" by design.
+  Minor Delays and a Part Closure during my checks, which resolve to "unknown" by design.
 - **Wide gaps is off for the Elizabeth line and the Overground**, and the infrequent
   Overground lines (Liberty, Lioness, Suffragette, Weaver) can only fire no trains. A
   line that is too infrequent for one snapshot to judge is shown as such.
 - **DLR has no train counts**, because `vehicleId` is blank in its feed. It is judged by
   per platform waits and gaps only, and a Suspended or Closed DLR cannot be checked.
-- **Buses are thin.** TfL reports a route as Good Service or Special Service, a first
+- **Buses are thin.** TfL reports a route as Good Service or Special Service, and a first
   search of a route has no earlier reading, so no buses can only fire for a route seen
-  running in the last 90 minutes, night routes are always unknown, and bunching and route
-  suggestions were cut. `?sample=1` has no bus search.
+  running in the last 90 minutes. Night routes are always unknown, I cut bunching and
+  route suggestions, and `?sample=1` has no bus search.
 - **No dark theme.**
 - **I did not run the outage test on production.** Simulating TfL being down would
   mean overwriting the live secret with an invalid one, and I chose not to do that on the
@@ -318,10 +319,10 @@ Said plainly, so nothing here is a surprise.
 ## Known risk
 
 An uncached `/api/snapshot` costs 8 to 19 ms of CPU, above the documented 10 ms free
-tier figure. Cloudflare did not enforce that limit in testing, but it could. The
+tier figure. Cloudflare did not enforce that limit in my testing, but it could. The
 mitigation is in the design: the heavy arrivals parsing runs in the Durable Object off
 the request path, a 45 second cache means most requests cost 1 to 2 ms, and concurrent
-requests share one build. If the limit were ever enforced, the first step would be to
+requests share one build. If the limit were ever enforced, my first step would be to
 move the status fetch into the cron refresh too, so the request path only reads stored
 data.
 
@@ -359,7 +360,7 @@ ran while I reviewed, and the two buckets overlap by about 11 minutes.
 
 ## Phone check
 
-Checked on a Samsung S23 5G in Chrome, on MTN mobile data. Sample mode at `/?sample=1`
+I checked on a Samsung S23 5G in Chrome, on MTN mobile data. Sample mode at `/?sample=1`
 showed 3 of 11 lines drifting with all three mismatch cards, the full line list and the
 three footer links.
 
